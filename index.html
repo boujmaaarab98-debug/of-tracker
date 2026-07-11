@@ -583,8 +583,8 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant){
   if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[], dateExp:null, comment:null };
   if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))){
     const txt = String(statutExistant).trim();
-    const estTermine = /termin/i.test(txt);
-    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estTermine ? null : txt };
+    const estExactementTermine = norm(txt) === 'terminé';
+    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estExactementTermine ? null : txt };
   }
   return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null };
 }
@@ -723,7 +723,7 @@ function traiter(){
       const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
       let retardJours = null;
-      if(r.dateAssignee && !estTermine){
+      if(r.dateAssignee && !estTermine && !isBlocked){
         const diff = daysBetween(today, r.dateAssignee);
         if(diff > 0) retardJours = diff;
       }
