@@ -363,9 +363,9 @@ const HISTORY_KEY = "of_historique";
 const LAST_RESULTS_KEY = "of_last_results";
 const DAILY_LOG_KEY = "of_daily_log";
 const SHEET_CONFIG = {
-  "P1 Assemblage": { ofCol: "of", urgenceCol: "arrêt", urgenceMode: "colonne" },
-  "P1 client":     { ofCol: "of", urgenceCol: null,    urgenceMode: "tout_urgent" },
-  "Latecoere":     { ofCol: "n°of", urgenceCol: null,  urgenceMode: "tout_urgent" },
+  "P1 Assemblage": { ofCol: "of", urgenceCol: "arrêt", urgenceMode: "colonne", dateCol: "ar" },
+  "P1 client":     { ofCol: "of", urgenceCol: null,    urgenceMode: "tout_urgent", dateCol: "ar" },
+  "Latecoere":     { ofCol: "n°of", urgenceCol: null,  urgenceMode: "tout_urgent", dateCol: "jour" },
 };
 
 let clientWB = null, erpWB = null;
@@ -491,12 +491,26 @@ document.getElementById('importHistFile').addEventListener('change', (e)=>{
 
 function excelDateToJs(value){
   if(value === null || value === undefined || value === '') return null;
+  if(value instanceof Date) return isNaN(value.getTime()) ? null : value;
   if(typeof value === 'number'){
     const ms = Math.round((value - 25569) * 86400 * 1000);
     const d = new Date(ms);
     return isNaN(d.getTime()) ? null : d;
   }
-  const d = new Date(value);
+  const s = String(value).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(m){
+    let [, dd, mm, yyyy] = m;
+    if(yyyy.length === 2) yyyy = '20' + yyyy;
+    const d = new Date(Number(yyyy), Number(mm)-1, Number(dd));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m){
+    const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
 function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
@@ -572,6 +586,8 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant){
   return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null };
 }
 
+const JOURS_SEMAINE = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+
 function parseClientSheet(wb, sheetName, cfg){
   if(!wb.SheetNames.includes(sheetName)) return [];
   const sheet = wb.Sheets[sheetName];
@@ -582,6 +598,15 @@ function parseClientSheet(wb, sheetName, cfg){
   const idxStatut = headers.indexOf('statut');
   const idxCommentaire = headers.indexOf('commentaire');
   const idxUrgence = cfg.urgenceCol ? headers.indexOf(cfg.urgenceCol) : -1;
+
+  let idxDate = -1;
+  if(cfg.dateCol === 'ar'){
+    idxDate = headers.indexOf('ar');
+  } else if(cfg.dateCol === 'jour'){
+    idxDate = headers.findIndex(h => JOURS_SEMAINE.some(j => h.includes(j)));
+    if(idxDate === -1) idxDate = headers.length - 1;
+  }
+
   if(idxOF === -1) return [];
   const out = [];
   for(let i=1;i<rows.length;i++){
@@ -595,7 +620,9 @@ function parseClientSheet(wb, sheetName, cfg){
     else { const v = idxUrgence>=0 ? row[idxUrgence] : null; urgent = v !== null && v !== undefined && String(v).trim() !== ''; }
     const statutExistant = idxStatut>=0 ? row[idxStatut] : null;
     const commentaireCol = idxCommentaire>=0 && row[idxCommentaire] ? String(row[idxCommentaire]).trim() : '';
-    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, commentaireCol });
+    const dateVal = idxDate>=0 ? row[idxDate] : null;
+    const dateAssignee = excelDateToJs(dateVal);
+    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, commentaireCol, dateAssignee });
   }
   return out;
 }
@@ -691,8 +718,8 @@ function traiter(){
       const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
       let retardJours = null;
-      if(dateExp && evolution !== 'terminé'){
-        const diff = daysBetween(today, dateExp);
+      if(r.dateAssignee && evolution !== 'terminé'){
+        const diff = daysBetween(today, r.dateAssignee);
         if(diff > 0) retardJours = diff;
       }
 
