@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OF Tracker — MK AERO</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
   :root{
     --bg: #14161a; --panel: #1b1e24; --panel-2: #21252c;
@@ -149,9 +150,10 @@
 
     <div class="nav">
       <div class="nav-item active" data-page="indicateurs"><span class="n">1</span> Indicateurs</div>
-      <div class="nav-item" data-page="tableaux"><span class="n">2</span> Tableaux</div>
-      <div class="nav-item" data-page="fichiers"><span class="n">3</span> Fichiers</div>
-      <div class="nav-item" data-page="historique"><span class="n">4</span> Historique</div>
+      <div class="nav-item" data-page="graphiques"><span class="n">2</span> Graphiques</div>
+      <div class="nav-item" data-page="tableaux"><span class="n">3</span> Tableaux</div>
+      <div class="nav-item" data-page="fichiers"><span class="n">4</span> Fichiers</div>
+      <div class="nav-item" data-page="historique"><span class="n">5</span> Historique</div>
     </div>
   </div>
 
@@ -171,6 +173,34 @@
       </div>
       <div id="indicFullNote" class="cta-row" style="display:none;">
         <button class="btn primary" id="goToTableauxBtn">Voir le détail par OF →</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="page" id="page-graphiques">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Évolution jour par jour</h2>
+        <div class="field-row">
+          <label>Du</label>
+          <input type="date" id="graphFrom">
+          <label>au</label>
+          <input type="date" id="graphTo">
+        </div>
+      </div>
+      <div id="graphEmpty" class="placeholder">
+        <div class="icon">◇</div>
+        <p>Pas encore assez d'historique — reviens ici après avoir traité plusieurs jours.</p>
+      </div>
+      <div id="graphContent" style="display:none;">
+        <div style="margin-bottom:32px;">
+          <div class="panel-head"><h2 style="color:var(--violet);">Nouveaux OF par jour</h2></div>
+          <div style="position:relative; height:260px;"><canvas id="chartNouveaux"></canvas></div>
+        </div>
+        <div>
+          <div class="panel-head"><h2 style="color:#c2c6cc;">OF terminés par jour</h2></div>
+          <div style="position:relative; height:260px;"><canvas id="chartTermines"></canvas></div>
+        </div>
       </div>
     </section>
   </div>
@@ -251,6 +281,7 @@
 const CLIENT_ERP_NAME = "MK AERO";
 const HISTORY_KEY = "of_historique";
 const LAST_RESULTS_KEY = "of_last_results";
+const DAILY_LOG_KEY = "of_daily_log";
 const SHEET_CONFIG = {
   "P1 Assemblage": { ofCol: "of", urgenceCol: "arrêt", urgenceMode: "colonne" },
   "P1 client":     { ofCol: "of", urgenceCol: null,    urgenceMode: "tout_urgent" },
@@ -272,11 +303,15 @@ function goToPage(pageKey){
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === pageKey));
   document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
   document.getElementById('page-' + pageKey).classList.add('active');
+  if(pageKey === 'graphiques') renderGraphiques();
 }
 document.querySelectorAll('.nav-item').forEach(el => { el.addEventListener('click', () => goToPage(el.dataset.page)); });
 document.getElementById('goToFichiersBtn').addEventListener('click', () => goToPage('fichiers'));
 document.getElementById('goToFichiersBtn2').addEventListener('click', () => goToPage('fichiers'));
 document.getElementById('goToTableauxBtn').addEventListener('click', () => goToPage('tableaux'));
+
+let chartNouveauxInstance = null;
+let chartTerminesInstance = null;
 
 function setupDropzone(dzId, fileInputId, fnameId, onLoaded){
   const dz = document.getElementById(dzId);
@@ -448,6 +483,74 @@ function parseClientSheet(wb, sheetName, cfg){
   return out;
 }
 
+function loadDailyLog(){
+  try{ const raw = localStorage.getItem(DAILY_LOG_KEY); return raw ? JSON.parse(raw) : {}; }
+  catch(e){ return {}; }
+}
+function saveDailyLogEntry(dateStr, snapshot){
+  const log = loadDailyLog();
+  log[dateStr] = snapshot;
+  try{ localStorage.setItem(DAILY_LOG_KEY, JSON.stringify(log)); }
+  catch(e){ console.error(e); }
+}
+
+function initGraphDateInputs(){
+  const log = loadDailyLog();
+  const dates = Object.keys(log).sort();
+  const fromInput = document.getElementById('graphFrom');
+  const toInput = document.getElementById('graphTo');
+  if(!fromInput.value){
+    fromInput.value = dates.length ? dates[Math.max(0, dates.length - 14)] : new Date().toISOString().slice(0,10);
+  }
+  if(!toInput.value){
+    toInput.value = dates.length ? dates[dates.length - 1] : new Date().toISOString().slice(0,10);
+  }
+}
+
+function renderGraphiques(){
+  initGraphDateInputs();
+  const log = loadDailyLog();
+  const from = document.getElementById('graphFrom').value;
+  const to = document.getElementById('graphTo').value;
+  const dates = Object.keys(log).filter(d => (!from || d >= from) && (!to || d <= to)).sort();
+
+  if(dates.length < 1){
+    document.getElementById('graphEmpty').style.display = '';
+    document.getElementById('graphContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('graphEmpty').style.display = 'none';
+  document.getElementById('graphContent').style.display = '';
+
+  const nouveauxData = dates.map(d => log[d].nouveaux || 0);
+  const terminesData = dates.map(d => log[d].termines || 0);
+
+  if(chartNouveauxInstance) chartNouveauxInstance.destroy();
+  if(chartTerminesInstance) chartTerminesInstance.destroy();
+
+  const commonOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ ticks:{ color:'#9aa1ac', font:{size:11} }, grid:{ color:'#23272f' } },
+      y:{ beginAtZero:true, ticks:{ color:'#9aa1ac', precision:0 }, grid:{ color:'#23272f' } }
+    }
+  };
+
+  chartNouveauxInstance = new Chart(document.getElementById('chartNouveaux'), {
+    type:'bar',
+    data:{ labels:dates, datasets:[{ label:'Nouveaux OF', data:nouveauxData, backgroundColor:'#8b7ff0' }] },
+    options:commonOpts
+  });
+  chartTerminesInstance = new Chart(document.getElementById('chartTermines'), {
+    type:'bar',
+    data:{ labels:dates, datasets:[{ label:'OF terminés', data:terminesData, backgroundColor:'#8a8f98' }] },
+    options:commonOpts
+  });
+}
+document.getElementById('graphFrom').addEventListener('change', renderGraphiques);
+document.getElementById('graphTo').addEventListener('change', renderGraphiques);
+
 function traiter(){
   setStatus("Traitement en cours…", false);
   const erpMap = parseERP(erpWB);
@@ -475,6 +578,14 @@ function traiter(){
   allRows.forEach(r => { newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr }; });
   saveHistorique(newHist);
   saveLastResults(dateStr);
+  saveDailyLogEntry(dateStr, {
+    total: allRows.length,
+    nouveaux: allRows.filter(r=>r.evolution==='nouveau').length,
+    progresses: allRows.filter(r=>r.evolution==='progressé').length,
+    stagnants: allRows.filter(r=>r.evolution==='stagnant').length,
+    termines: allRows.filter(r=>r.evolution==='terminé').length,
+    urgents: allRows.filter(r=>r.urgent).length,
+  });
 
   renderIndicateurs(dateStr);
   renderTables();
