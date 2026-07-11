@@ -705,6 +705,7 @@ const SHEET_CONFIG = {
 let clientWB = null, erpWB = null;
 let historique = {};
 let resultRows = [];
+let aogRows = [];
 let multiLotsDetail = [];
 let currentTab = "tous";
 let lastDateStr = null;
@@ -791,12 +792,13 @@ function loadLastResults(){
     const data = JSON.parse(raw);
     resultRows = data.resultRows || [];
     multiLotsDetail = data.multiLotsDetail || [];
+    aogRows = data.aogRows || [];
     lastDateStr = data.dateStr || null;
     if(resultRows.length){ renderIndicateurs(lastDateStr); renderTables(); renderAOG(); }
   }catch(e){ /* ignore */ }
 }
 function saveLastResults(dateStr){
-  try{ localStorage.setItem(LAST_RESULTS_KEY, JSON.stringify({ dateStr, resultRows, multiLotsDetail })); }
+  try{ localStorage.setItem(LAST_RESULTS_KEY, JSON.stringify({ dateStr, resultRows, multiLotsDetail, aogRows })); }
   catch(e){ console.error(e); }
 }
 
@@ -851,11 +853,17 @@ function excelDateToJs(value){
 function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
 function ageValueToHours(raw){
   if(raw === null || raw === undefined || raw === '') return null;
-  if(typeof raw === 'number' && !isNaN(raw)) return (raw - 1) * 24;
+  if(typeof raw === 'number' && !isNaN(raw)){
+    let h = (raw - 1) * 24;
+    if(h < 0) h = raw * 24; // valeur < 1 jour stockée comme heure pure (sans jour), pas de décalage -1
+    return h;
+  }
   if(raw instanceof Date){
     if(isNaN(raw.getTime())) return null;
     const serial = raw.getTime() / 86400000 + 25569;
-    return (serial - 1) * 24;
+    let h = (serial - 1) * 24;
+    if(h < 0) h = serial * 24;
+    return h;
   }
   const s = String(raw).trim();
   let m = s.match(/^1899-12-31[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
@@ -1090,7 +1098,6 @@ document.getElementById('graphFrom').addEventListener('change', renderGraphiques
 document.getElementById('graphTo').addEventListener('change', renderGraphiques);
 
 function renderAOG(){
-  const aogRows = resultRows.filter(r => r.isAOG);
   if(!aogRows.length){
     document.getElementById('aogEmpty').style.display = '';
     document.getElementById('aogContent').style.display = 'none';
@@ -1115,25 +1122,66 @@ function renderAOG(){
   document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val])=>
     `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
 
-  function formatDuree(r){
-    return formatDureeHeures(r.aogHeures !== null ? r.aogHeures : null, r.joursAOG);
-  }
-
-  const sorted = aogRows.slice().sort((a,b)=> (b.aogHeures ?? b.joursAOG*24 ?? 0) - (a.aogHeures ?? a.joursAOG*24 ?? 0));
+  const sorted = aogRows.slice().sort((a,b)=> (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
   const body = sorted.map(r => {
     const rowCls = r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : '');
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant' }[r.evolution] || r.evolution;
-    const statusLabel = { ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h' }[r.aogStatus] || '';
+    const statusLabel = { ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h', null:'—' }[r.aogStatus] || '—';
+    const urgenceHtml = r.urgent === null ? '<span class="badge normal">?</span>' : (r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>');
     return `<tr class="${rowCls}">
-      <td>${r.OF}</td><td>${r.sheet}</td><td>${r.statut}</td>
+      <td>${r.OF}</td><td>${r.sheet}</td><td>${r.phase}</td>
       <td>${evoLabel}</td>
-      <td style="font-weight:700;">${formatDuree(r)}</td>
+      <td style="font-weight:700;">${formatDureeHeures(r.aogHeures)}</td>
       <td>${statusLabel}</td>
-      <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td>
+      <td>${urgenceHtml}</td>
     </tr>`;
   }).join('');
   document.getElementById('aogTable').innerHTML =
     `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Évolution</th><th>Durée AOG</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+const BUFFER_RECEPTION_H = 4;
+function buildAOGRows(erpMap, historiqueLocal, dateStr, clientRows){
+  const rows = [];
+  for(const ofNum in erpMap){
+    const lots = erpMap[ofNum];
+    const aogLots = lots.filter(l => l.aog);
+    if(!aogLots.length) continue;
+
+    const remplis = lots.filter(l => qteEstRemplie(l.qte));
+    const effectifs = remplis.length > 0 ? remplis : lots;
+    let phase;
+    if(effectifs.length === 1){
+      phase = effectifs[0].phaseLibelle;
+    } else {
+      const avecNum = effectifs.filter(l => l.phaseNum !== null && !isNaN(l.phaseNum));
+      const bottleneck = avecNum.length ? avecNum.reduce((a,b)=> a.phaseNum <= b.phaseNum ? a : b) : effectifs[0];
+      phase = bottleneck.phaseLibelle;
+    }
+
+    const ancien = historiqueLocal[ofNum];
+    let evolution;
+    if(!ancien || !ancien.aogPhase) evolution = 'nouveau';
+    else if(ancien.aogPhase === phase) evolution = 'stagnant';
+    else evolution = 'progressé';
+
+    const heuresConnues = aogLots.filter(l => l.ageHeures !== null).map(l => l.ageHeures);
+    let aogHeures = null, aogStatus = null;
+    if(heuresConnues.length){
+      aogHeures = Math.max(...heuresConnues) + BUFFER_RECEPTION_H;
+      aogStatus = aogHeures >= 72 ? 'depasse' : (aogHeures >= 48 ? 'proche' : 'ok');
+    }
+
+    // essaie de retrouver le projet/urgence si cet OF existe aussi dans le fichier client (juste pour affichage)
+    const clientRow = clientRows.find(r => r.OF === ofNum);
+
+    rows.push({
+      OF: ofNum, phase, evolution, aogHeures, aogStatus,
+      sheet: clientRow ? clientRow.sheet : '—',
+      urgent: clientRow ? clientRow.urgent : null,
+    });
+  }
+  return rows;
 }
 
 function traiter(){
@@ -1182,27 +1230,9 @@ function traiter(){
         if(hConnues.length) dureeHeures = Math.max(...hConnues) + BUFFER_RECEPTION_H;
       }
 
-      const lotsErp = erpMap[r.OF] || [];
-      const aogLots = lotsErp.filter(l => l.aog);
-      const isAOG = aogLots.length > 0 && !estTermine;
-      let aogHeures = null, joursAOG = null, aogStatus = null, aogSince = null;
-      if(isAOG){
-        const heuresConnues = aogLots.filter(l => l.ageHeures !== null).map(l => l.ageHeures);
-        if(heuresConnues.length){
-          aogHeures = Math.max(...heuresConnues) + BUFFER_RECEPTION_H;
-          joursAOG = Math.round((aogHeures / 24) * 10) / 10;
-          aogStatus = aogHeures >= 72 ? 'depasse' : (aogHeures >= 48 ? 'proche' : 'ok');
-        } else {
-          // secours : pas de colonne Age lisible -> on suit depuis la 1ère détection
-          aogSince = (ancien && ancien.aogSince) ? ancien.aogSince : dateStr;
-          joursAOG = daysBetween(today, new Date(aogSince + 'T00:00:00'));
-          aogStatus = joursAOG >= 3 ? 'depasse' : (joursAOG === 2 ? 'proche' : 'ok');
-        }
-      }
-
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        isAOG, aogSince, aogHeures, joursAOG, aogStatus, dureeHeures });
+        dureeHeures });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1211,7 +1241,11 @@ function traiter(){
   lastDateStr = dateStr;
 
   const newHist = Object.assign({}, historique);
-  allRows.forEach(r => { newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since, aogSince:r.aogSince }; });
+  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since }); });
+
+  aogRows = buildAOGRows(erpMap, historique, dateStr, allRows);
+  aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase }); });
+
   saveHistorique(newHist);
   saveLastResults(dateStr);
 
