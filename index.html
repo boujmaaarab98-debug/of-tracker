@@ -601,7 +601,6 @@ function parseClientSheet(wb, sheetName, cfg){
   const headers = rows[0].map(norm);
   const idxOF = headers.indexOf(cfg.ofCol);
   const idxStatut = headers.indexOf('statut');
-  const idxCommentaire = headers.indexOf('commentaire');
   const idxUrgence = cfg.urgenceCol ? headers.indexOf(cfg.urgenceCol) : -1;
 
   let idxDate = -1;
@@ -624,10 +623,14 @@ function parseClientSheet(wb, sheetName, cfg){
     if(cfg.urgenceMode === 'tout_urgent'){ urgent = true; }
     else { const v = idxUrgence>=0 ? row[idxUrgence] : null; urgent = v !== null && v !== undefined && String(v).trim() !== ''; }
     const statutExistant = idxStatut>=0 ? row[idxStatut] : null;
-    const commentaireCol = idxCommentaire>=0 && row[idxCommentaire] ? String(row[idxCommentaire]).trim() : '';
     const dateVal = idxDate>=0 ? row[idxDate] : null;
     const dateAssignee = excelDateToJs(dateVal);
-    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, commentaireCol, dateAssignee });
+    let dateCellComment = '';
+    if(!dateAssignee && dateVal !== null && dateVal !== undefined && typeof dateVal !== 'number'){
+      const txt = String(dateVal).trim();
+      if(txt && norm(txt) !== 'non reçu') dateCellComment = txt;
+    }
+    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, dateAssignee, dateCellComment });
   }
   return out;
 }
@@ -723,7 +726,7 @@ function traiter(){
       else if(ancien.statut === statut) evolution = 'stagnant';
       else evolution = 'progressé';
 
-      const finalComment = r.commentaireCol || comment || null;
+      const finalComment = r.dateCellComment || comment || null;
       const isBlocked = !!finalComment && !estTermine;
       const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
