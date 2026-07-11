@@ -6,42 +6,69 @@
 <title>OF Tracker — MK AERO</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/dist/tabler-icons.min.css">
 <style>
   :root{
-    --bg: #14161a; --panel: #1b1e24; --panel-2: #21252c;
-    --border: #2c313a; --border-soft: #23272f;
-    --text: #e7e9ec; --text-dim: #9aa1ac; --text-faint: #656d78;
-    --steel: #4c7ea8; --steel-dim: #2e4a5f;
+    --bg: #0c1a26; --panel: #132531; --panel-2: #1a3040;
+    --border: #254256; --border-soft: #1e3648;
+    --text: #e7e9ec; --text-dim: #9aa1ac; --text-faint: #64798a;
+    --steel: #0AA967; --steel-dim: #123f30;
     --amber: #e8922c; --amber-dim: #4a3418;
-    --teal: #2ea38f; --teal-dim: #17453c;
-    --violet: #8b7ff0; --violet-dim: #362f5c;
-    --red: #d9534f; --red-dim: #4a2523;
+    --teal: #3fbf8f; --teal-dim: #1b4a3a;
+    --violet: #D6486B; --violet-dim: #431826;
+    --red: #E31937; --red-dim: #451420;
     --radius: 10px;
   }
   * { box-sizing: border-box; }
-  body{
-    margin:0; padding:0 24px 80px;
-    background:var(--bg); color:var(--text);
+  html, body{ margin:0; background:var(--bg); color:var(--text);
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
-    font-size:14px; line-height:1.5;
-  }
-  .wrap{ max-width:1180px; margin:0 auto; }
+    font-size:14px; line-height:1.5; }
+  .app-shell{ display:flex; min-height:100vh; }
 
-  .top{ padding:28px 0 0; }
+  /* ---- SIDEBAR ---- */
+  .sidebar{
+    width:64px; flex:0 0 64px; background:#0a1620; border-right:1px solid var(--border-soft);
+    display:flex; flex-direction:column; align-items:center; padding:20px 0; gap:8px;
+    position:sticky; top:0; height:100vh;
+  }
+  .sidebar .nav-item{
+    width:40px; height:40px; display:flex; align-items:center; justify-content:center;
+    border-radius:9px; color:var(--text-faint); font-size:19px; cursor:pointer;
+    border-bottom:none; margin:2px 0; transition:background .15s, color .15s;
+  }
+  .sidebar .nav-item:hover{ background:var(--panel-2); color:var(--text); }
+  .sidebar .nav-item.active{ background:var(--steel-dim); color:var(--steel); }
+
+  /* ---- MAIN / HERO ---- */
+  .main{ flex:1; min-width:0; padding:0 28px 80px; position:relative; }
+  .main::before{
+    content:''; position:fixed; right:-160px; bottom:-180px; width:820px; height:820px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath fill='%23e7e9ec' d='M100 8 L108 40 L108 95 L165 130 L165 142 L108 122 L108 150 L128 165 L128 174 L100 166 L72 174 L72 165 L92 150 L92 122 L35 142 L35 130 L92 95 L92 40 Z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; opacity:.04; pointer-events:none; z-index:0;
+  }
+  .wrap{ position:relative; z-index:1; max-width:1160px; margin:0 auto; }
+
+  .hero{
+    position:relative; overflow:hidden; margin:24px 0 24px; border-radius:14px;
+    background:linear-gradient(115deg, #0e2434 0%, #163449 55%, #0c1a26 100%);
+    border:1px solid var(--border-soft); padding:26px 28px;
+  }
+  .hero-plane{ position:absolute; right:-30px; top:-40px; width:280px; height:280px; opacity:.14; }
+  .brand{ display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; letter-spacing:.04em;
+    color:var(--text-dim); margin-bottom:14px; text-transform:uppercase; }
+  .brand i{ color:var(--steel); font-size:16px; }
   .eyebrow{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--steel); font-weight:600; margin-bottom:6px; }
-  .top h1{ margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.01em; }
-  .top .sub{ color:var(--text-dim); font-size:13px; margin-bottom:20px; }
-
-  .nav{ display:flex; gap:6px; border-bottom:1px solid var(--border-soft); margin-bottom:28px; }
-  .nav-item{
-    display:flex; align-items:center; gap:8px; padding:12px 18px; font-size:13.5px; font-weight:600;
-    color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; user-select:none;
+  .hero h1{ margin:0 0 4px; font-size:24px; font-weight:600; letter-spacing:-.01em; position:relative; z-index:1; }
+  .hero .sub{ color:var(--text-dim); font-size:13px; position:relative; z-index:1; max-width:60%; }
+  .hero-date{
+    position:absolute; top:26px; right:28px; display:flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:20px;
+    padding:8px 16px; font-size:12.5px; font-weight:600; color:var(--text-dim);
   }
-  .nav-item .n{ display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px;
-    border-radius:50%; background:var(--panel-2); color:var(--text-faint); font-size:11px; font-weight:700; }
-  .nav-item:hover{ color:var(--text); }
-  .nav-item.active{ color:var(--text); border-bottom-color:var(--steel); }
-  .nav-item.active .n{ background:var(--steel); color:#eaf3fb; }
+  .hero-date i{ color:var(--steel); }
+  .hero-date input[type=date]{ background:transparent; border:none; color:var(--text); padding:0; font-size:12.5px; font-weight:600; }
+
+  .nav{ display:none; }
 
   .page{ display:none; }
   .page.active{ display:block; animation:fade .15s ease; }
@@ -52,7 +79,7 @@
     padding:22px 24px; margin-bottom:20px;
   }
   .panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
-  .panel-head h2{ margin:0; font-size:14px; font-weight:600; color:var(--text); }
+  .panel-head h2{ margin:0; font-size:13.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--steel); }
   .panel-head .count{ font-size:12px; color:var(--text-dim); }
 
   .btn{
@@ -60,10 +87,14 @@
     color:var(--text); padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;
     transition:background .15s, border-color .15s;
   }
-  .btn:hover{ background:#272c34; border-color:#3a4049; }
-  .btn.primary{ background:var(--steel); border-color:var(--steel); color:#eaf3fb; }
-  .btn.primary:hover{ background:#5a90b8; }
-  .btn.primary:disabled{ background:#2a3540; border-color:#2a3540; color:#697380; cursor:not-allowed; }
+  .btn:hover{ background:#243547; border-color:#33526a; }
+  .btn.primary{
+    background:var(--steel); border-color:var(--steel); color:#08201a; border-radius:22px;
+    display:inline-flex; align-items:center; gap:8px; padding:11px 20px; text-transform:uppercase;
+    font-size:12px; letter-spacing:.04em;
+  }
+  .btn.primary:hover{ background:#0dc077; }
+  .btn.primary:disabled{ background:#213543; border-color:#213543; color:#5b7182; cursor:not-allowed; }
   .btn.ghost{ background:transparent; color:var(--text-dim); font-weight:500; padding:7px 12px; }
   .btn.ghost:hover{ background:var(--panel-2); color:var(--text); }
   .btn.danger-ghost{ background:transparent; color:var(--red); font-weight:500; padding:7px 12px; border-color:var(--red-dim); }
@@ -73,23 +104,32 @@
     border-radius:8px; padding:8px 10px; font-size:13px;
   }
 
-  .cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px; }
-  .card{ background:var(--panel-2); border-radius:8px; padding:16px; border-left:3px solid var(--border); }
-  .card .num{ font-size:26px; font-weight:700; line-height:1; }
-  .card .lbl{ font-size:12px; color:var(--text-dim); margin-top:6px; }
-  .card.c-total{ border-left-color:var(--steel); } .card.c-total .num{ color:var(--steel); }
-  .card.c-nouv{ border-left-color:var(--violet); } .card.c-nouv .num{ color:var(--violet); }
-  .card.c-prog{ border-left-color:var(--teal); } .card.c-prog .num{ color:var(--teal); }
-  .card.c-stag{ border-left-color:var(--amber); } .card.c-stag .num{ color:var(--amber); }
-  .card.c-term{ border-left-color:#8a8f98; } .card.c-term .num{ color:#c2c6cc; }
-  .card.c-urg{ border-left-color:var(--red); } .card.c-urg .num{ color:var(--red); }
-  .card.c-multi{ border-left-color:#5a6b7a; } .card.c-multi .num{ color:#a7b3bf; }
+  .cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
+  .card{ background:var(--panel-2); border-radius:10px; padding:16px; }
+  .card-icon{
+    width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-size:16px; margin-bottom:12px;
+  }
+  .card .num{ font-size:24px; font-weight:700; line-height:1; }
+  .card .lbl{ font-size:11.5px; color:var(--text-dim); margin:5px 0 10px; }
+  .card .bar{ height:4px; border-radius:3px; background:var(--border); overflow:hidden; }
+  .card .bar span{ display:block; height:100%; border-radius:3px; }
+  .card.c-total .card-icon{ background:var(--steel-dim); color:var(--steel); } .card.c-total .num{ color:var(--steel); } .card.c-total .bar span{ background:var(--steel); width:100%; }
+  .card.c-nouv .card-icon{ background:var(--violet-dim); color:var(--violet); } .card.c-nouv .num{ color:var(--violet); } .card.c-nouv .bar span{ background:var(--violet); }
+  .card.c-prog .card-icon{ background:var(--teal-dim); color:var(--teal); } .card.c-prog .num{ color:var(--teal); } .card.c-prog .bar span{ background:var(--teal); }
+  .card.c-stag .card-icon{ background:var(--amber-dim); color:var(--amber); } .card.c-stag .num{ color:var(--amber); } .card.c-stag .bar span{ background:var(--amber); }
+  .card.c-term .card-icon{ background:#2a333c; color:#c2c6cc; } .card.c-term .num{ color:#c2c6cc; } .card.c-term .bar span{ background:#8a8f98; }
+  .card.c-urg .card-icon{ background:var(--red-dim); color:var(--red); } .card.c-urg .num{ color:var(--red); } .card.c-urg .bar span{ background:var(--red); }
+  .card.c-multi .card-icon{ background:#233542; color:#7fa3bd; } .card.c-multi .num{ color:#a7c3d6; } .card.c-multi .bar span{ background:#4c7ea8; }
 
   .breakdown{ margin-top:20px; }
   .breakdown table{ width:100%; border-collapse:collapse; font-size:12.5px; }
   .breakdown th{ text-align:left; color:var(--text-faint); font-weight:600; padding:6px 10px; border-bottom:1px solid var(--border-soft); text-transform:uppercase; font-size:11px; letter-spacing:.04em; }
-  .breakdown td{ padding:8px 10px; border-bottom:1px solid var(--border-soft); }
+  .breakdown td{ padding:9px 10px; border-bottom:1px solid var(--border-soft); }
   .breakdown tr:last-child td{ border-bottom:none; }
+  .proj-cell{ display:flex; align-items:center; gap:9px; }
+  .proj-icon{ width:26px; height:26px; border-radius:50%; background:var(--panel); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; font-size:12.5px; color:var(--steel); flex:0 0 auto; }
 
   .cta-row{ display:flex; justify-content:flex-end; margin-top:18px; }
 
@@ -105,11 +145,11 @@
   table.data{ width:100%; border-collapse:collapse; font-size:12.5px; }
   table.data th{ text-align:left; padding:8px 10px; color:var(--text-faint); font-weight:600; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--panel); text-transform:uppercase; font-size:10.5px; letter-spacing:.04em; }
   table.data td{ padding:7px 10px; border-bottom:1px solid var(--border-soft); }
-  table.data tr:hover td{ background:#1f232a; }
+  table.data tr:hover td{ background:#1a2e3b; }
   .badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:10.5px; font-weight:700; letter-spacing:.02em; }
   .badge.urgent{ background:var(--red-dim); color:#f5a8a5; }
-  .badge.normal{ background:#262a31; color:var(--text-faint); }
-  .badge.multi{ background:#2a3644; color:#8fb3cc; }
+  .badge.normal{ background:#22303b; color:var(--text-faint); }
+  .badge.multi{ background:#1e3a4a; color:#8fb3cc; }
   .empty{ text-align:center; padding:40px 20px; color:var(--text-faint); font-size:13px; }
   .table-scroll{ max-height:480px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:6px; }
 
@@ -119,7 +159,7 @@
     text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
     background:var(--panel-2);
   }
-  .dropzone:hover, .dropzone.drag{ border-color:var(--steel); background:#1c2530; }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--steel); background:#183042; }
   .dropzone .label{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); font-weight:600; margin-bottom:8px; }
   .dropzone .fname{ font-size:13px; color:var(--text); word-break:break-all; margin-top:6px; }
   .dropzone .hint{ font-size:12px; color:var(--text-faint); margin-top:4px; }
@@ -141,21 +181,30 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app-shell">
 
-  <div class="top">
-    <div class="eyebrow">Suivi de production · MK AERO</div>
-    <h1>OF Tracker</h1>
-    <div class="sub">Compare le fichier client et l'export ERP, calcule les indicateurs du jour.</div>
+  <aside class="sidebar">
+    <div class="nav-item active" data-page="indicateurs" title="Indicateurs"><i class="ti ti-gauge"></i></div>
+    <div class="nav-item" data-page="graphiques" title="Graphiques"><i class="ti ti-chart-bar"></i></div>
+    <div class="nav-item" data-page="tableaux" title="Tableaux"><i class="ti ti-table"></i></div>
+    <div class="nav-item" data-page="fichiers" title="Fichiers"><i class="ti ti-folder"></i></div>
+    <div class="nav-item" data-page="historique" title="Historique"><i class="ti ti-clock"></i></div>
+  </aside>
 
-    <div class="nav">
-      <div class="nav-item active" data-page="indicateurs"><span class="n">1</span> Indicateurs</div>
-      <div class="nav-item" data-page="graphiques"><span class="n">2</span> Graphiques</div>
-      <div class="nav-item" data-page="tableaux"><span class="n">3</span> Tableaux</div>
-      <div class="nav-item" data-page="fichiers"><span class="n">4</span> Fichiers</div>
-      <div class="nav-item" data-page="historique"><span class="n">5</span> Historique</div>
-    </div>
-  </div>
+  <main class="main">
+    <div class="wrap">
+
+      <div class="hero">
+        <svg class="hero-plane" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path fill="#e7e9ec" d="M100 8 L108 40 L108 95 L165 130 L165 142 L108 122 L108 150 L128 165 L128 174 L100 166 L72 174 L72 165 L92 150 L92 122 L35 142 L35 130 L92 95 L92 40 Z"/>
+        </svg>
+        <div class="brand"><i class="ti ti-plane"></i> MK AERO</div>
+        <div class="eyebrow">Suivi de production</div>
+        <h1>OF Tracker</h1>
+        <div class="sub">Compare le fichier client et l'export ERP, calcule les indicateurs du jour.</div>
+        <div class="hero-date"><i class="ti ti-calendar"></i> <input type="date" id="heroDateInput"></div>
+      </div>
+
 
   <div class="page active" id="page-indicateurs">
     <section class="panel">
@@ -169,10 +218,10 @@
       </div>
       <div id="indicEmptyNote" class="cta-row" style="justify-content:space-between; align-items:center; display:none;">
         <span class="status-msg">Ces chiffres sont à 0 tant qu'aucun fichier n'a été traité.</span>
-        <button class="btn primary" id="goToFichiersBtn">Importer les fichiers →</button>
+        <button class="btn primary" id="goToFichiersBtn"><i class="ti ti-upload"></i> Importer les fichiers <i class="ti ti-arrow-right"></i></button>
       </div>
       <div id="indicFullNote" class="cta-row" style="display:none;">
-        <button class="btn primary" id="goToTableauxBtn">Voir le détail par OF →</button>
+        <button class="btn primary" id="goToTableauxBtn"><i class="ti ti-plane"></i> Voir le détail par OF <i class="ti ti-chevron-right"></i></button>
       </div>
     </section>
   </div>
@@ -198,7 +247,7 @@
           <div style="position:relative; height:260px;"><canvas id="chartNouveaux"></canvas></div>
         </div>
         <div>
-          <div class="panel-head"><h2 style="color:#c2c6cc;">OF terminés par jour</h2></div>
+          <div class="panel-head"><h2 style="color:#0AA967;">OF terminés par jour</h2></div>
           <div style="position:relative; height:260px;"><canvas id="chartTermines"></canvas></div>
         </div>
       </div>
@@ -211,7 +260,7 @@
       <div id="tableauxEmpty" class="placeholder" style="display:none;">
         <div class="icon">◇</div>
         <p>Aucune donnée — importe les fichiers d'abord.</p>
-        <button class="btn primary" id="goToFichiersBtn2">Importer les fichiers →</button>
+        <button class="btn primary" id="goToFichiersBtn2"><i class="ti ti-upload"></i> Importer les fichiers <i class="ti ti-arrow-right"></i></button>
       </div>
       <div id="tableauxContent">
         <div class="tabs" id="tabsRow"></div>
@@ -226,10 +275,7 @@
     <section class="panel">
       <div class="panel-head">
         <h2>Fichiers du jour</h2>
-        <div class="field-row">
-          <label>Date</label>
-          <input type="date" id="dateInput">
-        </div>
+        <span class="count">Date sélectionnée en haut de page</span>
       </div>
       <div class="upload-grid">
         <div class="dropzone" id="dz-client">
@@ -249,7 +295,7 @@
       </div>
       <div class="upload-actions">
         <span class="status-msg" id="statusMsg"></span>
-        <button class="btn primary" id="processBtn" disabled>Traiter le jour</button>
+        <button class="btn primary" id="processBtn" disabled><i class="ti ti-player-play"></i> Traiter le jour</button>
       </div>
     </section>
   </div>
@@ -274,7 +320,8 @@
       </div>
     </section>
   </div>
-
+    </div>
+  </main>
 </div>
 
 <script>
@@ -297,7 +344,7 @@ let lastDateStr = null;
 
 const norm = (s) => (s===null||s===undefined? "" : String(s)).replace(/\s+/g,' ').trim().toLowerCase();
 
-document.getElementById('dateInput').value = new Date().toISOString().slice(0,10);
+document.getElementById('heroDateInput').value = new Date().toISOString().slice(0,10);
 
 function goToPage(pageKey){
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === pageKey));
@@ -539,12 +586,12 @@ function renderGraphiques(){
 
   chartNouveauxInstance = new Chart(document.getElementById('chartNouveaux'), {
     type:'bar',
-    data:{ labels:dates, datasets:[{ label:'Nouveaux OF', data:nouveauxData, backgroundColor:'#8b7ff0' }] },
+    data:{ labels:dates, datasets:[{ label:'Nouveaux OF', data:nouveauxData, backgroundColor:'#D6486B' }] },
     options:commonOpts
   });
   chartTerminesInstance = new Chart(document.getElementById('chartTermines'), {
     type:'bar',
-    data:{ labels:dates, datasets:[{ label:'OF terminés', data:terminesData, backgroundColor:'#8a8f98' }] },
+    data:{ labels:dates, datasets:[{ label:'OF terminés', data:terminesData, backgroundColor:'#0AA967' }] },
     options:commonOpts
   });
 }
@@ -572,7 +619,7 @@ function traiter(){
   resultRows = allRows;
   multiLotsDetail = multiLots;
 
-  const dateStr = document.getElementById('dateInput').value;
+  const dateStr = document.getElementById('heroDateInput').value;
   lastDateStr = dateStr;
   const newHist = Object.assign({}, historique);
   allRows.forEach(r => { newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr }; });
@@ -606,19 +653,21 @@ function renderIndicateurs(dateStr){
   const multi = resultRows.filter(r=>r.isMulti).length;
 
   const cards = [
-    ['c-total','Total OF suivis', total], ['c-nouv','Nouveaux OF', nouveaux],
-    ['c-prog','Progressés', progresses], ['c-stag','Stagnants', stagnants],
-    ['c-term','Terminés', termines], ['c-urg','Urgents', urgents], ['c-multi','Multi-lots', multi],
+    ['c-total','ti-clipboard-list','Total OF suivis', total], ['c-nouv','ti-file-plus','Nouveaux OF', nouveaux],
+    ['c-prog','ti-trending-up','Progressés', progresses], ['c-stag','ti-clock-pause','Stagnants', stagnants],
+    ['c-term','ti-check','Terminés', termines], ['c-urg','ti-alert-triangle','Urgents', urgents], ['c-multi','ti-box','Multi-lots', multi],
   ];
-  document.getElementById('cardsRow').innerHTML = cards.map(([cls,lbl,val])=>
-    `<div class="card ${cls}"><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
+  document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val])=>
+    `<div class="card ${cls}"><div class="card-icon"><i class="ti ${ico}"></i></div><div class="num">${val}</div><div class="lbl">${lbl}</div><div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
 
+  const sheetIcons = { "P1 Assemblage":"ti-plane", "P1 client":"ti-settings", "Latecoere":"ti-link" };
   const sheets = Object.keys(SHEET_CONFIG);
   let rowsHtml = '';
   sheets.forEach(s=>{
     const rows = resultRows.filter(r=>r.sheet===s);
     rowsHtml += `<tr>
-      <td>${s}</td><td>${rows.length}</td>
+      <td><div class="proj-cell"><span class="proj-icon"><i class="ti ${sheetIcons[s]||'ti-folder'}"></i></span>${s}</div></td>
+      <td>${rows.length}</td>
       <td>${rows.filter(r=>r.evolution==='nouveau').length}</td>
       <td>${rows.filter(r=>r.evolution==='progressé').length}</td>
       <td>${rows.filter(r=>r.evolution==='stagnant').length}</td>
