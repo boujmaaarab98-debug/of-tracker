@@ -727,8 +727,10 @@ function traiter(){
       if(ancien && ancien.statut === statut && ancien.since) sinceDate = ancien.since;
       const sansMouvementJours = daysBetween(today, new Date(sinceDate + 'T00:00:00'));
 
+      const dateAssigneeStr = r.dateAssignee ? r.dateAssignee.toLocaleDateString('fr-FR') : null;
+
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
-        comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours });
+        comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -867,9 +869,10 @@ function renderDataTable(){
   }
   if(currentTab === 'retard'){
     const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.statut}</td>
+      <td>${r.dateAssigneeStr || '—'}</td>
       <td style="color:var(--red); font-weight:700;">${r.retardJours} j</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Date donnée</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     return;
   }
   if(currentTab === 'bloque'){
@@ -900,8 +903,9 @@ function renderDataTable(){
   }
   const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
     <td>${r.statut}${r.isMulti ? ' <span class="badge multi">multi-lots</span>' : ''}</td>
+    <td>${r.dateAssigneeStr || '—'}</td>
     <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 loadHistorique();
