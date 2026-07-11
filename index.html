@@ -569,7 +569,7 @@ function parseERP(wb){
   return map;
 }
 function qteEstRemplie(qte){ return qte !== null && qte !== undefined && String(qte).trim() !== ''; }
-function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant){
+function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant, knownPhases){
   const lots = erpMap[ofNum];
   if(lots && lots.length){
     const remplis = lots.filter(l => qteEstRemplie(l.qte));
@@ -584,7 +584,9 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant){
   if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))){
     const txt = String(statutExistant).trim();
     const estExactementTermine = norm(txt) === 'terminé';
-    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estExactementTermine ? null : txt };
+    const estPhaseConnue = knownPhases && knownPhases.has(norm(txt));
+    const estComment = !estExactementTermine && !estPhaseConnue;
+    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estComment ? txt : null };
   }
   return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null };
 }
@@ -704,12 +706,15 @@ function traiter(){
   const dateStr = document.getElementById('heroDateInput').value;
   const today = new Date(dateStr + 'T00:00:00');
 
+  const knownPhases = new Set();
+  Object.values(erpMap).forEach(lots => lots.forEach(l => { if(l.phaseLibelle) knownPhases.add(norm(l.phaseLibelle)); }));
+
   let allRows = [];
   let multiLots = [];
   for(const [sheetName, cfg] of Object.entries(SHEET_CONFIG)){
     const rows = parseClientSheet(clientWB, sheetName, cfg);
     for(const r of rows){
-      const { statut, isMulti, lots, dateExp, comment } = determinerStatut(r.OF, erpMap, historique, r.statutExistant);
+      const { statut, isMulti, lots, dateExp, comment } = determinerStatut(r.OF, erpMap, historique, r.statutExistant, knownPhases);
       const ancien = historique[r.OF];
       const estTermine = statut === 'terminé';
       let evolution;
