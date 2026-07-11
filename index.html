@@ -881,6 +881,7 @@ function parseERP(wb){
   const idxQte = headers.findIndex(h => h.includes('traiter'));
   const idxDateExp = headers.findIndex(h => h.includes('expéd'));
   const idxAOG = headers.indexOf('aog');
+  const idxAge = headers.indexOf('age');
 
   const map = {};
   for(let i=1;i<rows.length;i++){
@@ -891,12 +892,19 @@ function parseERP(wb){
     if(ofRaw===null || ofRaw===undefined || ofRaw==='') continue;
     const ofNum = String(ofRaw).trim();
     const aogVal = idxAOG>=0 ? row[idxAOG] : null;
+    let ageHeures = null;
+    if(idxAge>=0){
+      const ageRaw = row[idxAge];
+      if(typeof ageRaw === 'number') ageHeures = (ageRaw - 1) * 24;
+      else if(ageRaw instanceof Date) ageHeures = null;
+    }
     const lot = {
       phaseNum: idxNPhase>=0 && row[idxNPhase]!==null ? Number(row[idxNPhase]) : null,
       phaseLibelle: idxLibelle>=0 && row[idxLibelle]!==null ? String(row[idxLibelle]).trim() : '',
       qte: idxQte>=0 ? row[idxQte] : null,
       dateExp: idxDateExp>=0 ? excelDateToJs(row[idxDateExp]) : null,
       aog: aogVal !== null && aogVal !== undefined && String(aogVal).trim() !== '',
+      ageHeures,
     };
     if(!map[ofNum]) map[ofNum] = [];
     map[ofNum].push(lot);
@@ -1075,28 +1083,37 @@ function renderAOG(){
   const cards = [
     ['c-aog-total','alert-triangle','Total OF AOG', total],
     ['c-prog','trending-up','Ont progressé', bouges],
-    ['c-aog-ok','check','Dans les délais (0-1j)', ok],
-    ['c-aog-proche','clock-alert','Approche 3j (J2)', proche],
-    ['c-aog-depasse','lock','Dépassé 3 jours', depasse],
+    ['c-aog-ok','check','Dans les délais (<48h)', ok],
+    ['c-aog-proche','clock-alert','Approche 72h (48-72h)', proche],
+    ['c-aog-depasse','lock','Dépassé 72h', depasse],
   ];
   document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val])=>
     `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
 
-  const sorted = aogRows.slice().sort((a,b)=> (b.joursAOG||0) - (a.joursAOG||0));
+  function formatDuree(r){
+    if(r.aogHeures !== null){
+      const j = Math.floor(r.aogHeures / 24);
+      const h = Math.round(r.aogHeures % 24);
+      return j > 0 ? `${j}j ${h}h` : `${h}h`;
+    }
+    return r.joursAOG + ' j (estimé)';
+  }
+
+  const sorted = aogRows.slice().sort((a,b)=> (b.aogHeures ?? b.joursAOG*24 ?? 0) - (a.aogHeures ?? a.joursAOG*24 ?? 0));
   const body = sorted.map(r => {
     const rowCls = r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : '');
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant' }[r.evolution] || r.evolution;
-    const statusLabel = { ok:'Dans les délais', proche:'⚠ Approche 3j', depasse:'🔴 Dépassé' }[r.aogStatus] || '';
+    const statusLabel = { ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h' }[r.aogStatus] || '';
     return `<tr class="${rowCls}">
       <td>${r.OF}</td><td>${r.sheet}</td><td>${r.statut}</td>
       <td>${evoLabel}</td>
-      <td style="font-weight:700;">${r.joursAOG} j</td>
+      <td style="font-weight:700;">${formatDuree(r)}</td>
       <td>${statusLabel}</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td>
     </tr>`;
   }).join('');
   document.getElementById('aogTable').innerHTML =
-    `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Évolution</th><th>Jours AOG</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Évolution</th><th>Durée AOG</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function traiter(){
@@ -1139,17 +1156,26 @@ function traiter(){
       const dateAssigneeStr = r.dateAssignee ? r.dateAssignee.toLocaleDateString('fr-FR') : null;
 
       const lotsErp = erpMap[r.OF] || [];
-      const isAOG = lotsErp.some(l => l.aog) && !estTermine;
-      let aogSince = null, joursAOG = null, aogStatus = null;
+      const aogLots = lotsErp.filter(l => l.aog);
+      const isAOG = aogLots.length > 0 && !estTermine;
+      let aogHeures = null, joursAOG = null, aogStatus = null, aogSince = null;
       if(isAOG){
-        aogSince = (ancien && ancien.aogSince) ? ancien.aogSince : dateStr;
-        joursAOG = daysBetween(today, new Date(aogSince + 'T00:00:00'));
-        aogStatus = joursAOG >= 3 ? 'depasse' : (joursAOG === 2 ? 'proche' : 'ok');
+        const heuresConnues = aogLots.filter(l => l.ageHeures !== null).map(l => l.ageHeures);
+        if(heuresConnues.length){
+          aogHeures = Math.max(...heuresConnues);
+          joursAOG = Math.round((aogHeures / 24) * 10) / 10;
+          aogStatus = aogHeures >= 72 ? 'depasse' : (aogHeures >= 48 ? 'proche' : 'ok');
+        } else {
+          // secours : pas de colonne Age lisible -> on suit depuis la 1ère détection
+          aogSince = (ancien && ancien.aogSince) ? ancien.aogSince : dateStr;
+          joursAOG = daysBetween(today, new Date(aogSince + 'T00:00:00'));
+          aogStatus = joursAOG >= 3 ? 'depasse' : (joursAOG === 2 ? 'proche' : 'ok');
+        }
       }
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        isAOG, aogSince, joursAOG, aogStatus });
+        isAOG, aogSince, aogHeures, joursAOG, aogStatus });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
