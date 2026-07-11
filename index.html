@@ -6,20 +6,20 @@
 <title>OF Tracker — MK AERO</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/dist/tabler-icons.min.css">
 <style>
   :root{
     --bg: #0c1a26; --panel: #132531; --panel-2: #1a3040;
     --border: #254256; --border-soft: #1e3648;
     --text: #e7e9ec; --text-dim: #9aa1ac; --text-faint: #64798a;
-    --steel: #0AA967; --steel-dim: #123f30;
+    --steel: #4c7ea8; --steel-dim: #2e4a5f;
     --amber: #e8922c; --amber-dim: #4a3418;
-    --teal: #3fbf8f; --teal-dim: #1b4a3a;
-    --violet: #D6486B; --violet-dim: #431826;
-    --red: #E31937; --red-dim: #451420;
+    --teal: #2ea38f; --teal-dim: #17453c;
+    --violet: #8b7ff0; --violet-dim: #362f5c;
+    --red: #d9534f; --red-dim: #4a2523;
     --radius: 10px;
   }
   * { box-sizing: border-box; }
+  .icon{ width:1em; height:1em; display:inline-block; vertical-align:-0.15em; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
   html, body{ margin:0; background:var(--bg); color:var(--text);
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
     font-size:14px; line-height:1.5; }
@@ -53,7 +53,16 @@
     background:linear-gradient(115deg, #0e2434 0%, #163449 55%, #0c1a26 100%);
     border:1px solid var(--border-soft); padding:26px 28px;
   }
-  .hero-plane{ position:absolute; right:-30px; top:-40px; width:280px; height:280px; opacity:.14; }
+  .hero::before{
+    content:''; position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size:28px 28px;
+    -webkit-mask-image:linear-gradient(115deg, rgba(0,0,0,.9), transparent 75%);
+    mask-image:linear-gradient(115deg, rgba(0,0,0,.9), transparent 75%);
+    pointer-events:none;
+  }
   .brand{ display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; letter-spacing:.04em;
     color:var(--text-dim); margin-bottom:14px; text-transform:uppercase; }
   .brand i{ color:var(--steel); font-size:16px; }
@@ -184,25 +193,22 @@
 <div class="app-shell">
 
   <aside class="sidebar">
-    <div class="nav-item active" data-page="indicateurs" title="Indicateurs"><i class="ti ti-gauge"></i></div>
-    <div class="nav-item" data-page="graphiques" title="Graphiques"><i class="ti ti-chart-bar"></i></div>
-    <div class="nav-item" data-page="tableaux" title="Tableaux"><i class="ti ti-table"></i></div>
-    <div class="nav-item" data-page="fichiers" title="Fichiers"><i class="ti ti-folder"></i></div>
-    <div class="nav-item" data-page="historique" title="Historique"><i class="ti ti-clock"></i></div>
+    <div class="nav-item active" data-page="indicateurs" title="Indicateurs"><svg class="icon" viewBox="0 0 24 24"><path d="M4 15a8 8 0 1 1 16 0"/><line x1="12" y1="15" x2="16" y2="10"/></svg></div>
+    <div class="nav-item" data-page="graphiques" title="Graphiques"><svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/></svg></div>
+    <div class="nav-item" data-page="tableaux" title="Tableaux"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg></div>
+    <div class="nav-item" data-page="fichiers" title="Fichiers"><svg class="icon" viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"/></svg></div>
+    <div class="nav-item" data-page="historique" title="Historique"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v4.5l3 2"/></svg></div>
   </aside>
 
   <main class="main">
     <div class="wrap">
 
       <div class="hero">
-        <svg class="hero-plane" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path fill="#e7e9ec" d="M100 8 L108 40 L108 95 L165 130 L165 142 L108 122 L108 150 L128 165 L128 174 L100 166 L72 174 L72 165 L92 150 L92 122 L35 142 L35 130 L92 95 L92 40 Z"/>
-        </svg>
-        <div class="brand"><i class="ti ti-plane"></i> MK AERO</div>
+        <div class="brand"><svg class="icon" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5"/><path d="M21 3 15 21l-4.5-7.5L3 9Z"/></svg> MK AERO</div>
         <div class="eyebrow">Suivi de production</div>
         <h1>OF Tracker</h1>
         <div class="sub">Compare le fichier client et l'export ERP, calcule les indicateurs du jour.</div>
-        <div class="hero-date"><i class="ti ti-calendar"></i> <input type="date" id="heroDateInput"></div>
+        <div class="hero-date"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg> <input type="date" id="heroDateInput"></div>
       </div>
 
 
@@ -218,10 +224,10 @@
       </div>
       <div id="indicEmptyNote" class="cta-row" style="justify-content:space-between; align-items:center; display:none;">
         <span class="status-msg">Ces chiffres sont à 0 tant qu'aucun fichier n'a été traité.</span>
-        <button class="btn primary" id="goToFichiersBtn"><i class="ti ti-upload"></i> Importer les fichiers <i class="ti ti-arrow-right"></i></button>
+        <button class="btn primary" id="goToFichiersBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 21h16"/></svg> Importer les fichiers <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></button>
       </div>
       <div id="indicFullNote" class="cta-row" style="display:none;">
-        <button class="btn primary" id="goToTableauxBtn"><i class="ti ti-plane"></i> Voir le détail par OF <i class="ti ti-chevron-right"></i></button>
+        <button class="btn primary" id="goToTableauxBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5"/><path d="M21 3 15 21l-4.5-7.5L3 9Z"/></svg> Voir le détail par OF <svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
       </div>
     </section>
   </div>
@@ -247,7 +253,7 @@
           <div style="position:relative; height:260px;"><canvas id="chartNouveaux"></canvas></div>
         </div>
         <div>
-          <div class="panel-head"><h2 style="color:#0AA967;">OF terminés par jour</h2></div>
+          <div class="panel-head"><h2 style="color:#c2c6cc;">OF terminés par jour</h2></div>
           <div style="position:relative; height:260px;"><canvas id="chartTermines"></canvas></div>
         </div>
       </div>
@@ -260,7 +266,7 @@
       <div id="tableauxEmpty" class="placeholder" style="display:none;">
         <div class="icon">◇</div>
         <p>Aucune donnée — importe les fichiers d'abord.</p>
-        <button class="btn primary" id="goToFichiersBtn2"><i class="ti ti-upload"></i> Importer les fichiers <i class="ti ti-arrow-right"></i></button>
+        <button class="btn primary" id="goToFichiersBtn2"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 21h16"/></svg> Importer les fichiers <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></button>
       </div>
       <div id="tableauxContent">
         <div class="tabs" id="tabsRow"></div>
@@ -295,7 +301,7 @@
       </div>
       <div class="upload-actions">
         <span class="status-msg" id="statusMsg"></span>
-        <button class="btn primary" id="processBtn" disabled><i class="ti ti-player-play"></i> Traiter le jour</button>
+        <button class="btn primary" id="processBtn" disabled><svg class="icon" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8Z"/></svg> Traiter le jour</button>
       </div>
     </section>
   </div>
@@ -325,6 +331,21 @@
 </div>
 
 <script>
+const ICONS = {
+  'clipboard-list': '<rect x="6" y="4" width="12" height="17" rx="1.5"/><rect x="9" y="2" width="6" height="3" rx="0.8"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/>',
+  'file-plus': '<path d="M14 2H6a1 1 0 0 0-1 1v18a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8Z"/><path d="M14 2v6h6"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/>',
+  'trending-up': '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 6h6v6"/>',
+  'clock-pause': '<circle cx="12" cy="12" r="8.5"/><line x1="10" y1="9.5" x2="10" y2="14.5"/><line x1="14" y1="9.5" x2="14" y2="14.5"/>',
+  'check': '<path d="M4 12l5 5L20 6"/>',
+  'alert-triangle': '<path d="M12 3 2 20h20Z"/><line x1="12" y1="9.5" x2="12" y2="14"/>',
+  'box': '<path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="M3 8l9 5 9-5"/><line x1="12" y1="13" x2="12" y2="21"/>',
+  'plane': '<path d="M21 3 10.5 13.5"/><path d="M21 3 15 21l-4.5-7.5L3 9Z"/>',
+  'settings': '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  'link': '<path d="M8 12a4 4 0 0 1 4-4h2a4 4 0 0 1 0 8h-1"/><path d="M16 12a4 4 0 0 1-4 4H10a4 4 0 0 1 0-8h1"/>',
+  'folder': '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"/>',
+};
+function svgIcon(name){ return `<svg class="icon" viewBox="0 0 24 24">${ICONS[name] || ''}</svg>`; }
+
 const CLIENT_ERP_NAME = "MK AERO";
 const HISTORY_KEY = "of_historique";
 const LAST_RESULTS_KEY = "of_last_results";
@@ -586,12 +607,12 @@ function renderGraphiques(){
 
   chartNouveauxInstance = new Chart(document.getElementById('chartNouveaux'), {
     type:'bar',
-    data:{ labels:dates, datasets:[{ label:'Nouveaux OF', data:nouveauxData, backgroundColor:'#D6486B' }] },
+    data:{ labels:dates, datasets:[{ label:'Nouveaux OF', data:nouveauxData, backgroundColor:'#8b7ff0' }] },
     options:commonOpts
   });
   chartTerminesInstance = new Chart(document.getElementById('chartTermines'), {
     type:'bar',
-    data:{ labels:dates, datasets:[{ label:'OF terminés', data:terminesData, backgroundColor:'#0AA967' }] },
+    data:{ labels:dates, datasets:[{ label:'OF terminés', data:terminesData, backgroundColor:'#8a8f98' }] },
     options:commonOpts
   });
 }
@@ -653,20 +674,20 @@ function renderIndicateurs(dateStr){
   const multi = resultRows.filter(r=>r.isMulti).length;
 
   const cards = [
-    ['c-total','ti-clipboard-list','Total OF suivis', total], ['c-nouv','ti-file-plus','Nouveaux OF', nouveaux],
-    ['c-prog','ti-trending-up','Progressés', progresses], ['c-stag','ti-clock-pause','Stagnants', stagnants],
-    ['c-term','ti-check','Terminés', termines], ['c-urg','ti-alert-triangle','Urgents', urgents], ['c-multi','ti-box','Multi-lots', multi],
+    ['c-total','clipboard-list','Total OF suivis', total], ['c-nouv','file-plus','Nouveaux OF', nouveaux],
+    ['c-prog','trending-up','Progressés', progresses], ['c-stag','clock-pause','Stagnants', stagnants],
+    ['c-term','check','Terminés', termines], ['c-urg','alert-triangle','Urgents', urgents], ['c-multi','box','Multi-lots', multi],
   ];
   document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val])=>
-    `<div class="card ${cls}"><div class="card-icon"><i class="ti ${ico}"></i></div><div class="num">${val}</div><div class="lbl">${lbl}</div><div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div><div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
 
-  const sheetIcons = { "P1 Assemblage":"ti-plane", "P1 client":"ti-settings", "Latecoere":"ti-link" };
+  const sheetIcons = { "P1 Assemblage":"plane", "P1 client":"settings", "Latecoere":"link" };
   const sheets = Object.keys(SHEET_CONFIG);
   let rowsHtml = '';
   sheets.forEach(s=>{
     const rows = resultRows.filter(r=>r.sheet===s);
     rowsHtml += `<tr>
-      <td><div class="proj-cell"><span class="proj-icon"><i class="ti ${sheetIcons[s]||'ti-folder'}"></i></span>${s}</div></td>
+      <td><div class="proj-cell"><span class="proj-icon">${svgIcon(sheetIcons[s]||'folder')}</span>${s}</div></td>
       <td>${rows.length}</td>
       <td>${rows.filter(r=>r.evolution==='nouveau').length}</td>
       <td>${rows.filter(r=>r.evolution==='progressé').length}</td>
