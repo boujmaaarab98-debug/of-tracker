@@ -849,6 +849,14 @@ function excelDateToJs(value){
   return isNaN(d.getTime()) ? null : d;
 }
 function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
+function formatDureeHeures(heures, joursFallback){
+  if(heures === null || heures === undefined){
+    return joursFallback !== null && joursFallback !== undefined ? joursFallback + ' j (estimé)' : '—';
+  }
+  const j = Math.floor(heures / 24);
+  const h = Math.round(heures % 24);
+  return j > 0 ? `${j}j ${h}h` : `${h}h`;
+}
 
 const CATEGORIES_BLOCAGE = [
   { key:'methode', label:'Méthode', keywords:['méthode','methode','method'] },
@@ -1091,12 +1099,7 @@ function renderAOG(){
     `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
 
   function formatDuree(r){
-    if(r.aogHeures !== null){
-      const j = Math.floor(r.aogHeures / 24);
-      const h = Math.round(r.aogHeures % 24);
-      return j > 0 ? `${j}j ${h}h` : `${h}h`;
-    }
-    return r.joursAOG + ' j (estimé)';
+    return formatDureeHeures(r.aogHeures !== null ? r.aogHeures : null, r.joursAOG);
   }
 
   const sorted = aogRows.slice().sort((a,b)=> (b.aogHeures ?? b.joursAOG*24 ?? 0) - (a.aogHeures ?? a.joursAOG*24 ?? 0));
@@ -1155,6 +1158,13 @@ function traiter(){
 
       const dateAssigneeStr = r.dateAssignee ? r.dateAssignee.toLocaleDateString('fr-FR') : null;
 
+      const BUFFER_RECEPTION_H = 4;
+      let dureeHeures = null;
+      if(lots && lots.length){
+        const hConnues = lots.filter(l => l.ageHeures !== null).map(l => l.ageHeures);
+        if(hConnues.length) dureeHeures = Math.max(...hConnues) + BUFFER_RECEPTION_H;
+      }
+
       const lotsErp = erpMap[r.OF] || [];
       const aogLots = lotsErp.filter(l => l.aog);
       const isAOG = aogLots.length > 0 && !estTermine;
@@ -1162,7 +1172,7 @@ function traiter(){
       if(isAOG){
         const heuresConnues = aogLots.filter(l => l.ageHeures !== null).map(l => l.ageHeures);
         if(heuresConnues.length){
-          aogHeures = Math.max(...heuresConnues);
+          aogHeures = Math.max(...heuresConnues) + BUFFER_RECEPTION_H;
           joursAOG = Math.round((aogHeures / 24) * 10) / 10;
           aogStatus = aogHeures >= 72 ? 'depasse' : (aogHeures >= 48 ? 'proche' : 'ok');
         } else {
@@ -1175,7 +1185,7 @@ function traiter(){
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        isAOG, aogSince, aogHeures, joursAOG, aogStatus });
+        isAOG, aogSince, aogHeures, joursAOG, aogStatus, dureeHeures });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1328,9 +1338,9 @@ function downloadCSV(filename, rows2d){
 function exportCurrentTable(){
   let header, rows;
   if(currentTab === 'retard'){
-    header = ['OF','Projet','Statut','Date donnée','Retard (j)','Urgence'];
+    header = ['OF','Projet','Statut','Durée','Date donnée','Retard (j)','Urgence'];
     rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours)
-      .map(r => [r.OF, r.sheet, r.statut, r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
+      .map(r => [r.OF, r.sheet, r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'bloque'){
     header = ['OF','Projet','Catégorie','Commentaire','Urgence'];
     rows = resultRows.filter(r=>r.isBlocked).map(r => [r.OF, r.sheet, r.category, r.comment, r.urgent?'Urgent':'Normal']);
@@ -1343,9 +1353,9 @@ function exportCurrentTable(){
       });
     });
   } else {
-    header = ['OF','Projet','Statut','Date donnée','Urgence'];
+    header = ['OF','Projet','Statut','Durée','Date donnée','Urgence'];
     const filtered = currentTab === 'tous' ? resultRows : resultRows.filter(r=>r.evolution===currentTab);
-    rows = filtered.map(r => [r.OF, r.sheet, r.statut, r.dateAssigneeStr||'', r.urgent?'Urgent':'Normal']);
+    rows = filtered.map(r => [r.OF, r.sheet, r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.urgent?'Urgent':'Normal']);
   }
   if(!rows.length){ alert("Aucune donnée à exporter dans cette catégorie."); return; }
   downloadCSV(`of_tracker_${currentTab}_${lastDateStr||'export'}.csv`, [header, ...rows]);
@@ -1402,9 +1412,10 @@ function renderDataTable(){
   }
   const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
     <td>${r.statut}${r.isMulti ? ' <span class="badge multi">multi-lots</span>' : ''}</td>
+    <td>${formatDureeHeures(r.dureeHeures)}</td>
     <td>${r.dateAssigneeStr || '—'}</td>
     <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function ofSearch(query){
@@ -1435,6 +1446,7 @@ function ofSearch(query){
         <div class="of-field"><div class="lbl">Date donnée</div><div class="val">${r.dateAssigneeStr || '—'}</div></div>
         <div class="of-field"><div class="lbl">Retard</div><div class="val" style="${r.retardJours?'color:var(--red);':''}">${r.retardJours ? r.retardJours + ' j' : '—'}</div></div>
         <div class="of-field"><div class="lbl">Statut inchangé depuis</div><div class="val">${r.since || '—'}</div></div>
+        <div class="of-field"><div class="lbl">Durée à ce poste</div><div class="val">${formatDureeHeures(r.dureeHeures)}</div></div>
       </div>
       ${commentHtml}${lotsHtml}
     </div>`;
