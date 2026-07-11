@@ -1107,20 +1107,23 @@ function renderAOG(){
   document.getElementById('aogContent').style.display = '';
 
   const total = aogRows.length;
+  const nouveaux = aogRows.filter(r=>r.evolution==='nouveau').length;
   const ok = aogRows.filter(r=>r.aogStatus==='ok').length;
   const proche = aogRows.filter(r=>r.aogStatus==='proche').length;
   const depasse = aogRows.filter(r=>r.aogStatus==='depasse').length;
   const bouges = aogRows.filter(r=>r.evolution==='progressé').length;
+  const prev = lastDateStr ? getPreviousDayEntry(lastDateStr) : null;
 
   const cards = [
-    ['c-aog-total','alert-triangle','Total OF AOG', total],
-    ['c-prog','trending-up','Ont progressé', bouges],
-    ['c-aog-ok','check','Dans les délais (<48h)', ok],
-    ['c-aog-proche','clock-alert','Approche 72h (48-72h)', proche],
-    ['c-aog-depasse','lock','Dépassé 72h', depasse],
+    ['c-aog-total','alert-triangle','Total OF AOG', total, 'aogTotal', 'neutral'],
+    ['c-nouv','file-plus','Nouveaux AOG (aujourd\'hui)', nouveaux, 'aogNouveaux', 'down'],
+    ['c-prog','trending-up','Ont progressé', bouges, 'aogBouges', 'up'],
+    ['c-aog-ok','check','Dans les délais (<48h)', ok, 'aogOk', 'neutral'],
+    ['c-aog-proche','clock-alert','Approche 72h (48-72h)', proche, 'aogProche', 'down'],
+    ['c-aog-depasse','lock','Dépassé 72h', depasse, 'aogDepasse', 'down'],
   ];
-  document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val])=>
-    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
+  document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir])=>
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}</div>`).join('');
 
   const sorted = aogRows.slice().sort((a,b)=> (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
   const body = sorted.map(r => {
@@ -1267,6 +1270,12 @@ function traiter(){
     tauxRetard: allRows.length ? Math.round((enRetard.length/allRows.length)*100) : 0,
     retardMoyen: retardMoyenVal,
     sansMvt48: sansMvt48Count,
+    aogTotal: aogRows.length,
+    aogNouveaux: aogRows.filter(r=>r.evolution==='nouveau').length,
+    aogBouges: aogRows.filter(r=>r.evolution==='progressé').length,
+    aogOk: aogRows.filter(r=>r.aogStatus==='ok').length,
+    aogProche: aogRows.filter(r=>r.aogStatus==='proche').length,
+    aogDepasse: aogRows.filter(r=>r.aogStatus==='depasse').length,
   });
 
   renderIndicateurs(dateStr);
