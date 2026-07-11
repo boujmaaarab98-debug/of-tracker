@@ -7,43 +7,53 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
-    --bg: #14161a;
-    --panel: #1b1e24;
-    --panel-2: #21252c;
-    --border: #2c313a;
-    --border-soft: #23272f;
-    --text: #e7e9ec;
-    --text-dim: #9aa1ac;
-    --text-faint: #656d78;
-    --steel: #4c7ea8;
-    --steel-dim: #2e4a5f;
-    --amber: #e8922c;
-    --amber-dim: #4a3418;
-    --teal: #2ea38f;
-    --teal-dim: #17453c;
-    --violet: #8b7ff0;
-    --violet-dim: #362f5c;
-    --red: #d9534f;
-    --red-dim: #4a2523;
+    --bg: #14161a; --panel: #1b1e24; --panel-2: #21252c;
+    --border: #2c313a; --border-soft: #23272f;
+    --text: #e7e9ec; --text-dim: #9aa1ac; --text-faint: #656d78;
+    --steel: #4c7ea8; --steel-dim: #2e4a5f;
+    --amber: #e8922c; --amber-dim: #4a3418;
+    --teal: #2ea38f; --teal-dim: #17453c;
+    --violet: #8b7ff0; --violet-dim: #362f5c;
+    --red: #d9534f; --red-dim: #4a2523;
     --radius: 10px;
   }
   * { box-sizing: border-box; }
   body{
-    margin:0; padding:32px 24px 80px;
+    margin:0; padding:0 24px 80px;
     background:var(--bg); color:var(--text);
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
     font-size:14px; line-height:1.5;
   }
   .wrap{ max-width:1180px; margin:0 auto; }
-  .top{ display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px; gap:16px; flex-wrap:wrap; }
-  .title-block .eyebrow{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--steel); font-weight:600; margin-bottom:6px; }
-  .title-block h1{ margin:0; font-size:22px; font-weight:600; letter-spacing:-.01em; }
-  .title-block .sub{ color:var(--text-dim); font-size:13px; margin-top:4px; }
-  .top-actions{ display:flex; gap:10px; align-items:center; }
-  input[type=date]{
-    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
-    border-radius:8px; padding:8px 10px; font-size:13px;
+
+  .top{ padding:28px 0 0; }
+  .eyebrow{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--steel); font-weight:600; margin-bottom:6px; }
+  .top h1{ margin:0 0 4px; font-size:22px; font-weight:600; letter-spacing:-.01em; }
+  .top .sub{ color:var(--text-dim); font-size:13px; margin-bottom:20px; }
+
+  .nav{ display:flex; gap:6px; border-bottom:1px solid var(--border-soft); margin-bottom:28px; }
+  .nav-item{
+    display:flex; align-items:center; gap:8px; padding:12px 18px; font-size:13.5px; font-weight:600;
+    color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; user-select:none;
   }
+  .nav-item .n{ display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px;
+    border-radius:50%; background:var(--panel-2); color:var(--text-faint); font-size:11px; font-weight:700; }
+  .nav-item:hover{ color:var(--text); }
+  .nav-item.active{ color:var(--text); border-bottom-color:var(--steel); }
+  .nav-item.active .n{ background:var(--steel); color:#eaf3fb; }
+
+  .page{ display:none; }
+  .page.active{ display:block; animation:fade .15s ease; }
+  @keyframes fade{ from{opacity:0;} to{opacity:1;} }
+
+  section.panel{
+    background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+    padding:22px 24px; margin-bottom:20px;
+  }
+  .panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+  .panel-head h2{ margin:0; font-size:14px; font-weight:600; color:var(--text); }
+  .panel-head .count{ font-size:12px; color:var(--text-dim); }
+
   .btn{
     border-radius:8px; border:1px solid var(--border); background:var(--panel-2);
     color:var(--text); padding:9px 16px; font-size:13px; font-weight:600; cursor:pointer;
@@ -57,35 +67,11 @@
   .btn.ghost:hover{ background:var(--panel-2); color:var(--text); }
   .btn.danger-ghost{ background:transparent; color:var(--red); font-weight:500; padding:7px 12px; border-color:var(--red-dim); }
   .btn.danger-ghost:hover{ background:var(--red-dim); }
-
-  section.panel{
-    background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
-    padding:22px 24px; margin-bottom:24px;
+  input[type=date]{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:8px 10px; font-size:13px;
   }
-  .panel-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-  .panel-head h2{ margin:0; font-size:14px; font-weight:600; color:var(--text); }
-  .panel-head .count{ font-size:12px; color:var(--text-dim); }
 
-  /* --- ZONE 1 : UPLOAD --- */
-  .upload-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .dropzone{
-    border:1.5px dashed var(--border); border-radius:8px; padding:22px 16px;
-    text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
-    background:var(--panel-2);
-  }
-  .dropzone:hover, .dropzone.drag{ border-color:var(--steel); background:#1c2530; }
-  .dropzone .label{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); font-weight:600; margin-bottom:8px; }
-  .dropzone .fname{ font-size:13px; color:var(--text); word-break:break-all; margin-top:6px; }
-  .dropzone .hint{ font-size:12px; color:var(--text-faint); margin-top:4px; }
-  .dropzone .icon{ font-size:22px; color:var(--text-faint); margin-bottom:6px; }
-  .dropzone.filled{ border-style:solid; border-color:var(--teal); }
-  .dropzone.filled .icon{ color:var(--teal); }
-  .upload-actions{ display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:18px; }
-  .status-msg{ font-size:12.5px; color:var(--text-dim); }
-  .status-msg.error{ color:var(--red); }
-  .status-msg.ok{ color:var(--teal); }
-
-  /* --- ZONE 2 : INDICATEURS --- */
   .cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px; }
   .card{ background:var(--panel-2); border-radius:8px; padding:16px; border-left:3px solid var(--border); }
   .card .num{ font-size:26px; font-weight:700; line-height:1; }
@@ -104,7 +90,12 @@
   .breakdown td{ padding:8px 10px; border-bottom:1px solid var(--border-soft); }
   .breakdown tr:last-child td{ border-bottom:none; }
 
-  /* --- ZONE 3 : TABLEAUX --- */
+  .cta-row{ display:flex; justify-content:flex-end; margin-top:18px; }
+
+  .placeholder{ text-align:center; padding:60px 20px; color:var(--text-faint); }
+  .placeholder .icon{ font-size:32px; margin-bottom:14px; opacity:.4; }
+  .placeholder p{ margin:0 0 18px; font-size:13.5px; }
+
   .tabs{ display:flex; gap:4px; border-bottom:1px solid var(--border-soft); margin-bottom:14px; flex-wrap:wrap; }
   .tab{ padding:9px 14px; font-size:12.5px; font-weight:600; color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; }
   .tab:hover{ color:var(--text); }
@@ -119,97 +110,147 @@
   .badge.normal{ background:#262a31; color:var(--text-faint); }
   .badge.multi{ background:#2a3644; color:#8fb3cc; }
   .empty{ text-align:center; padding:40px 20px; color:var(--text-faint); font-size:13px; }
-  .empty .icon{ font-size:28px; margin-bottom:10px; opacity:.5; }
   .table-scroll{ max-height:480px; overflow-y:auto; border:1px solid var(--border-soft); border-radius:6px; }
 
-  .placeholder{ text-align:center; padding:50px 20px; color:var(--text-faint); }
-  .placeholder .icon{ font-size:30px; margin-bottom:12px; opacity:.4; }
-  .placeholder p{ margin:0; font-size:13px; }
+  .upload-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .dropzone{
+    border:1.5px dashed var(--border); border-radius:8px; padding:26px 16px;
+    text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+    background:var(--panel-2);
+  }
+  .dropzone:hover, .dropzone.drag{ border-color:var(--steel); background:#1c2530; }
+  .dropzone .label{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint); font-weight:600; margin-bottom:8px; }
+  .dropzone .fname{ font-size:13px; color:var(--text); word-break:break-all; margin-top:6px; }
+  .dropzone .hint{ font-size:12px; color:var(--text-faint); margin-top:4px; }
+  .dropzone .icon{ font-size:22px; color:var(--text-faint); margin-bottom:6px; }
+  .dropzone.filled{ border-style:solid; border-color:var(--teal); }
+  .dropzone.filled .icon{ color:var(--teal); }
+  .upload-actions{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:18px; flex-wrap:wrap; }
+  .status-msg{ font-size:12.5px; color:var(--text-dim); }
+  .status-msg.error{ color:var(--red); }
+  .status-msg.ok{ color:var(--teal); }
+  .field-row{ display:flex; align-items:center; gap:10px; }
+  .field-row label{ font-size:12.5px; color:var(--text-dim); }
 
-  .hist-note{ font-size:11.5px; color:var(--text-faint); margin-top:14px; padding-top:14px; border-top:1px solid var(--border-soft); }
+  .hist-stats{ display:flex; gap:24px; margin-bottom:20px; flex-wrap:wrap; }
+  .hist-stat .num{ font-size:24px; font-weight:700; color:var(--steel); }
+  .hist-stat .lbl{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+  .hist-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .hist-note{ font-size:12.5px; color:var(--text-faint); margin-top:18px; padding-top:16px; border-top:1px solid var(--border-soft); }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <div class="top">
-    <div class="title-block">
-      <div class="eyebrow">Suivi de production · MK AERO</div>
-      <h1>OF Tracker</h1>
-      <div class="sub">Compare le fichier client et l'export ERP, calcule les indicateurs du jour.</div>
-    </div>
-    <div class="top-actions">
-      <input type="date" id="dateInput">
-      <button class="btn ghost" id="exportHistBtn">Exporter l'historique</button>
-      <button class="btn ghost" id="importHistBtn">Importer l'historique</button>
-      <input type="file" id="importHistFile" accept=".json" style="display:none">
-      <button class="btn danger-ghost" id="resetHistBtn">Réinitialiser l'historique</button>
+    <div class="eyebrow">Suivi de production · MK AERO</div>
+    <h1>OF Tracker</h1>
+    <div class="sub">Compare le fichier client et l'export ERP, calcule les indicateurs du jour.</div>
+
+    <div class="nav">
+      <div class="nav-item active" data-page="indicateurs"><span class="n">1</span> Indicateurs</div>
+      <div class="nav-item" data-page="tableaux"><span class="n">2</span> Tableaux</div>
+      <div class="nav-item" data-page="fichiers"><span class="n">3</span> Fichiers</div>
+      <div class="nav-item" data-page="historique"><span class="n">4</span> Historique</div>
     </div>
   </div>
 
-  <!-- ZONE 1 : UPLOAD -->
-  <section class="panel">
-    <div class="panel-head">
-      <h2>1 · Fichiers du jour</h2>
-      <span class="count" id="histInfo">Historique : chargement…</span>
-    </div>
-    <div class="upload-grid">
-      <div class="dropzone" id="dz-client">
-        <div class="icon">▤</div>
-        <div class="label">Fichier client</div>
-        <div class="hint">P1 Assemblage · P1 client · Latecoere (.xlsx)</div>
-        <div class="fname" id="fname-client"></div>
-        <input type="file" id="file-client" accept=".xlsx,.xls" style="display:none">
+  <div class="page active" id="page-indicateurs">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Indicateurs du jour</h2>
+        <span class="count" id="indicDate"></span>
       </div>
-      <div class="dropzone" id="dz-erp">
-        <div class="icon">▤</div>
-        <div class="label">Export ERP</div>
-        <div class="hint">Export de production, filtré sur MK AERO (.xls / .xlsx)</div>
-        <div class="fname" id="fname-erp"></div>
-        <input type="file" id="file-erp" accept=".xlsx,.xls" style="display:none">
+      <div class="cards" id="cardsRow"></div>
+      <div class="breakdown">
+        <table id="breakdownTable"></table>
       </div>
-    </div>
-    <div class="upload-actions">
-      <span class="status-msg" id="statusMsg"></span>
-      <button class="btn primary" id="processBtn" disabled>Traiter le jour</button>
-    </div>
-  </section>
+      <div id="indicEmptyNote" class="cta-row" style="justify-content:space-between; align-items:center; display:none;">
+        <span class="status-msg">Ces chiffres sont à 0 tant qu'aucun fichier n'a été traité.</span>
+        <button class="btn primary" id="goToFichiersBtn">Importer les fichiers →</button>
+      </div>
+      <div id="indicFullNote" class="cta-row" style="display:none;">
+        <button class="btn primary" id="goToTableauxBtn">Voir le détail par OF →</button>
+      </div>
+    </section>
+  </div>
 
-  <!-- ZONE 2 : INDICATEURS -->
-  <section class="panel" id="panel-indic" style="display:none;">
-    <div class="panel-head">
-      <h2>2 · Indicateurs</h2>
-      <span class="count" id="indicDate"></span>
-    </div>
-    <div class="cards" id="cardsRow"></div>
-    <div class="breakdown">
-      <table id="breakdownTable"></table>
-    </div>
-    <div class="hist-note">L'historique a été mis à jour avec les statuts du jour — il servira de référence pour la prochaine comparaison.</div>
-  </section>
-  <section class="panel" id="panel-indic-empty">
-    <div class="placeholder">
-      <div class="icon">◇</div>
-      <p>Les indicateurs apparaîtront ici une fois les 2 fichiers traités.</p>
-    </div>
-  </section>
+  <div class="page" id="page-tableaux">
+    <section class="panel">
+      <div class="panel-head"><h2>Détail par OF</h2></div>
+      <div id="tableauxEmpty" class="placeholder" style="display:none;">
+        <div class="icon">◇</div>
+        <p>Aucune donnée — importe les fichiers d'abord.</p>
+        <button class="btn primary" id="goToFichiersBtn2">Importer les fichiers →</button>
+      </div>
+      <div id="tableauxContent">
+        <div class="tabs" id="tabsRow"></div>
+        <div class="table-scroll">
+          <table class="data" id="dataTable"></table>
+        </div>
+      </div>
+    </section>
+  </div>
 
-  <!-- ZONE 3 : TABLEAUX -->
-  <section class="panel" id="panel-tables" style="display:none;">
-    <div class="panel-head">
-      <h2>3 · Détail par OF</h2>
-    </div>
-    <div class="tabs" id="tabsRow"></div>
-    <div class="table-scroll">
-      <table class="data" id="dataTable"></table>
-    </div>
-  </section>
+  <div class="page" id="page-fichiers">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Fichiers du jour</h2>
+        <div class="field-row">
+          <label>Date</label>
+          <input type="date" id="dateInput">
+        </div>
+      </div>
+      <div class="upload-grid">
+        <div class="dropzone" id="dz-client">
+          <div class="icon">▤</div>
+          <div class="label">Fichier client</div>
+          <div class="hint">P1 Assemblage · P1 client · Latecoere (.xlsx)</div>
+          <div class="fname" id="fname-client"></div>
+          <input type="file" id="file-client" accept=".xlsx,.xls" style="display:none">
+        </div>
+        <div class="dropzone" id="dz-erp">
+          <div class="icon">▤</div>
+          <div class="label">Export ERP</div>
+          <div class="hint">Export de production, filtré sur MK AERO (.xls / .xlsx)</div>
+          <div class="fname" id="fname-erp"></div>
+          <input type="file" id="file-erp" accept=".xlsx,.xls" style="display:none">
+        </div>
+      </div>
+      <div class="upload-actions">
+        <span class="status-msg" id="statusMsg"></span>
+        <button class="btn primary" id="processBtn" disabled>Traiter le jour</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="page" id="page-historique">
+    <section class="panel">
+      <div class="panel-head"><h2>Historique (mémoire jour à jour)</h2></div>
+      <div class="hist-stats">
+        <div class="hist-stat"><div class="num" id="histCount">0</div><div class="lbl">OF connus</div></div>
+        <div class="hist-stat"><div class="num" id="histLastDate">—</div><div class="lbl">Dernière mise à jour</div></div>
+      </div>
+      <div class="hist-actions">
+        <button class="btn" id="exportHistBtn">Exporter l'historique</button>
+        <button class="btn" id="importHistBtn">Importer l'historique</button>
+        <input type="file" id="importHistFile" accept=".json" style="display:none">
+        <button class="btn danger-ghost" id="resetHistBtn">Réinitialiser l'historique</button>
+      </div>
+      <div class="hist-note">
+        L'historique permet de savoir quels OF sont nouveaux, ont progressé ou sont
+        stagnants d'un jour à l'autre. Il est stocké dans ce navigateur (localStorage) —
+        exporte-le régulièrement pour ne pas le perdre si tu changes de PC ou de navigateur.
+      </div>
+    </section>
+  </div>
 
 </div>
 
 <script>
 const CLIENT_ERP_NAME = "MK AERO";
 const HISTORY_KEY = "of_historique";
+const LAST_RESULTS_KEY = "of_last_results";
 const SHEET_CONFIG = {
   "P1 Assemblage": { ofCol: "of", urgenceCol: "arrêt", urgenceMode: "colonne" },
   "P1 client":     { ofCol: "of", urgenceCol: null,    urgenceMode: "tout_urgent" },
@@ -221,10 +262,21 @@ let historique = {};
 let resultRows = [];
 let multiLotsDetail = [];
 let currentTab = "tous";
+let lastDateStr = null;
 
 const norm = (s) => (s===null||s===undefined? "" : String(s)).replace(/\s+/g,' ').trim().toLowerCase();
 
 document.getElementById('dateInput').value = new Date().toISOString().slice(0,10);
+
+function goToPage(pageKey){
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === pageKey));
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + pageKey).classList.add('active');
+}
+document.querySelectorAll('.nav-item').forEach(el => { el.addEventListener('click', () => goToPage(el.dataset.page)); });
+document.getElementById('goToFichiersBtn').addEventListener('click', () => goToPage('fichiers'));
+document.getElementById('goToFichiersBtn2').addEventListener('click', () => goToPage('fichiers'));
+document.getElementById('goToTableauxBtn').addEventListener('click', () => goToPage('tableaux'));
 
 function setupDropzone(dzId, fileInputId, fnameId, onLoaded){
   const dz = document.getElementById(dzId);
@@ -241,7 +293,6 @@ function setupDropzone(dzId, fileInputId, fnameId, onLoaded){
     if(f) handleFile(f, fnameId, dz, onLoaded);
   });
 }
-
 function handleFile(file, fnameId, dz, onLoaded){
   document.getElementById(fnameId).textContent = file.name;
   dz.classList.add('filled');
@@ -252,83 +303,83 @@ function handleFile(file, fnameId, dz, onLoaded){
       const wb = XLSX.read(data, { type:'array', cellDates:false });
       onLoaded(wb);
       checkReady();
-    }catch(err){
-      setStatus("Erreur de lecture du fichier : " + err.message, true);
-    }
+    }catch(err){ setStatus("Erreur de lecture du fichier : " + err.message, true); }
   };
   reader.readAsArrayBuffer(file);
 }
-
 setupDropzone('dz-client','file-client','fname-client', wb => { clientWB = wb; });
 setupDropzone('dz-erp','file-erp','fname-erp', wb => { erpWB = wb; });
-
-function checkReady(){
-  document.getElementById('processBtn').disabled = !(clientWB && erpWB);
-}
-
+function checkReady(){ document.getElementById('processBtn').disabled = !(clientWB && erpWB); }
 function setStatus(msg, isError){
   const el = document.getElementById('statusMsg');
   el.textContent = msg;
   el.className = 'status-msg' + (isError ? ' error' : ' ok');
 }
 
-// ---------------- STORAGE (localStorage, pour site autonome) ----------------
-async function loadHistorique(){
-  try{
-    const raw = localStorage.getItem(HISTORY_KEY);
-    historique = raw ? JSON.parse(raw) : {};
-  }catch(e){ historique = {}; }
-  document.getElementById('histInfo').textContent = `Historique : ${Object.keys(historique).length} OF connus`;
+function loadHistorique(){
+  try{ const raw = localStorage.getItem(HISTORY_KEY); historique = raw ? JSON.parse(raw) : {}; }
+  catch(e){ historique = {}; }
+  renderHistoriquePage();
 }
-async function saveHistorique(newHist){
-  try{
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(newHist));
-  }catch(e){ console.error('Erreur sauvegarde historique', e); }
+function saveHistorique(newHist){
+  try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(newHist)); }
+  catch(e){ console.error('Erreur sauvegarde historique', e); }
   historique = newHist;
-  document.getElementById('histInfo').textContent = `Historique : ${Object.keys(historique).length} OF connus`;
+  renderHistoriquePage();
 }
-document.getElementById('resetHistBtn').addEventListener('click', async ()=>{
+function renderHistoriquePage(){
+  const keys = Object.keys(historique);
+  document.getElementById('histCount').textContent = keys.length;
+  let lastDate = '—';
+  keys.forEach(k=>{ if(historique[k].date) lastDate = historique[k].date; });
+  document.getElementById('histLastDate').textContent = lastDate;
+}
+function loadLastResults(){
+  try{
+    const raw = localStorage.getItem(LAST_RESULTS_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    resultRows = data.resultRows || [];
+    multiLotsDetail = data.multiLotsDetail || [];
+    lastDateStr = data.dateStr || null;
+    if(resultRows.length){ renderIndicateurs(lastDateStr); renderTables(); }
+  }catch(e){ /* ignore */ }
+}
+function saveLastResults(dateStr){
+  try{ localStorage.setItem(LAST_RESULTS_KEY, JSON.stringify({ dateStr, resultRows, multiLotsDetail })); }
+  catch(e){ console.error(e); }
+}
+
+document.getElementById('resetHistBtn').addEventListener('click', ()=>{
   if(!confirm("Réinitialiser l'historique ? Tous les OF redeviendront 'nouveaux' au prochain traitement.")) return;
-  await saveHistorique({});
+  saveHistorique({});
   setStatus("Historique réinitialisé.", false);
 });
-
 document.getElementById('exportHistBtn').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(historique, null, 2)], { type:'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `historique_of_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  setStatus("Historique exporté — garde ce fichier en sécurité (utile si tu changes de navigateur/PC).", false);
+  a.href = url; a.download = `historique_of_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
 });
-
 document.getElementById('importHistBtn').addEventListener('click', ()=> document.getElementById('importHistFile').click());
 document.getElementById('importHistFile').addEventListener('change', (e)=>{
   const f = e.target.files[0];
   if(!f) return;
   const reader = new FileReader();
-  reader.onload = async (ev)=>{
-    try{
-      const data = JSON.parse(ev.target.result);
-      await saveHistorique(data);
-      setStatus("Historique importé avec succès.", false);
-    }catch(err){
-      setStatus("Fichier d'historique invalide.", true);
-    }
+  reader.onload = (ev)=>{
+    try{ const data = JSON.parse(ev.target.result); saveHistorique(data); }
+    catch(err){ alert("Fichier d'historique invalide."); }
   };
   reader.readAsText(f);
 });
 
-// ---------------- PARSING ERP ----------------
 function parseERP(wb){
   const sheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:null });
   if(rows.length < 2) return {};
   const headers = rows[0].map(norm);
-
   const idxClient = headers.indexOf('client');
   let idxNPhase = headers.indexOf('n° phase');
   if(idxNPhase === -1) idxNPhase = headers.findIndex(h => h.includes('phase') && !h.includes('fin'));
@@ -354,35 +405,23 @@ function parseERP(wb){
   }
   return map;
 }
-
-function qteEstRemplie(qte){
-  return qte !== null && qte !== undefined && String(qte).trim() !== '';
-}
-
+function qteEstRemplie(qte){ return qte !== null && qte !== undefined && String(qte).trim() !== ''; }
 function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant){
   const lots = erpMap[ofNum];
   if(lots && lots.length){
     const remplis = lots.filter(l => qteEstRemplie(l.qte));
     const effectifs = remplis.length > 0 ? remplis : lots;
-    if(effectifs.length === 1){
-      return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs };
-    }
-    // plusieurs lots avec quantité remplie => multi-lot réel, bottleneck = phase la moins avancée
+    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs };
     const avecNum = effectifs.filter(l => l.phaseNum !== null && !isNaN(l.phaseNum));
     const bottleneck = avecNum.length ? avecNum.reduce((a,b)=> a.phaseNum <= b.phaseNum ? a : b) : effectifs[0];
     return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs };
   }
   const ancien = historiqueLocal[ofNum];
-  if(ancien && ancien.statut && ancien.statut !== 'non reçu'){
-    return { statut:'terminé', isMulti:false, lots:[] };
-  }
-  if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))){
-    return { statut: String(statutExistant).trim(), isMulti:false, lots:[] };
-  }
+  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[] };
+  if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))) return { statut: String(statutExistant).trim(), isMulti:false, lots:[] };
   return { statut:'non reçu', isMulti:false, lots:[] };
 }
 
-// ---------------- PARSING CLIENT ----------------
 function parseClientSheet(wb, sheetName, cfg){
   if(!wb.SheetNames.includes(sheetName)) return [];
   const sheet = wb.Sheets[sheetName];
@@ -393,7 +432,6 @@ function parseClientSheet(wb, sheetName, cfg){
   const idxStatut = headers.indexOf('statut');
   const idxUrgence = cfg.urgenceCol ? headers.indexOf(cfg.urgenceCol) : -1;
   if(idxOF === -1) return [];
-
   const out = [];
   for(let i=1;i<rows.length;i++){
     const row = rows[i];
@@ -403,21 +441,16 @@ function parseClientSheet(wb, sheetName, cfg){
     const ofNum = String(ofRaw).trim();
     let urgent;
     if(cfg.urgenceMode === 'tout_urgent'){ urgent = true; }
-    else {
-      const v = idxUrgence>=0 ? row[idxUrgence] : null;
-      urgent = v !== null && v !== undefined && String(v).trim() !== '';
-    }
+    else { const v = idxUrgence>=0 ? row[idxUrgence] : null; urgent = v !== null && v !== undefined && String(v).trim() !== ''; }
     const statutExistant = idxStatut>=0 ? row[idxStatut] : null;
     out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant });
   }
   return out;
 }
 
-// ---------------- TRAITEMENT ----------------
-async function traiter(){
+function traiter(){
   setStatus("Traitement en cours…", false);
   const erpMap = parseERP(erpWB);
-
   let allRows = [];
   let multiLots = [];
   for(const [sheetName, cfg] of Object.entries(SHEET_CONFIG)){
@@ -429,37 +462,29 @@ async function traiter(){
       if(!ancien) evolution = 'nouveau';
       else if(ancien.statut === statut) evolution = 'stagnant';
       else evolution = (statut === 'terminé') ? 'terminé' : 'progressé';
-
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution });
-      if(isMulti){
-        lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
-      }
+      if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
-
   resultRows = allRows;
   multiLotsDetail = multiLots;
 
   const dateStr = document.getElementById('dateInput').value;
+  lastDateStr = dateStr;
   const newHist = Object.assign({}, historique);
-  allRows.forEach(r => {
-    newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr };
-  });
-  await saveHistorique(newHist);
+  allRows.forEach(r => { newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr }; });
+  saveHistorique(newHist);
+  saveLastResults(dateStr);
 
   renderIndicateurs(dateStr);
   renderTables();
   setStatus(`Traitement terminé — ${allRows.length} OF analysés.`, false);
+  goToPage('indicateurs');
 }
-
 document.getElementById('processBtn').addEventListener('click', traiter);
 
-// ---------------- RENDER INDICATEURS ----------------
 function renderIndicateurs(dateStr){
-  document.getElementById('panel-indic').style.display = '';
-  document.getElementById('panel-indic-empty').style.display = 'none';
-  document.getElementById('panel-tables').style.display = '';
-  document.getElementById('indicDate').textContent = dateStr;
+  document.getElementById('indicDate').textContent = dateStr || '';
 
   const total = resultRows.length;
   const nouveaux = resultRows.filter(r=>r.evolution==='nouveau').length;
@@ -470,26 +495,19 @@ function renderIndicateurs(dateStr){
   const multi = resultRows.filter(r=>r.isMulti).length;
 
   const cards = [
-    ['c-total','Total OF suivis', total],
-    ['c-nouv','Nouveaux OF', nouveaux],
-    ['c-prog','Progressés', progresses],
-    ['c-stag','Stagnants', stagnants],
-    ['c-term','Terminés', termines],
-    ['c-urg','Urgents', urgents],
-    ['c-multi','Multi-lots', multi],
+    ['c-total','Total OF suivis', total], ['c-nouv','Nouveaux OF', nouveaux],
+    ['c-prog','Progressés', progresses], ['c-stag','Stagnants', stagnants],
+    ['c-term','Terminés', termines], ['c-urg','Urgents', urgents], ['c-multi','Multi-lots', multi],
   ];
   document.getElementById('cardsRow').innerHTML = cards.map(([cls,lbl,val])=>
-    `<div class="card ${cls}"><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`
-  ).join('');
+    `<div class="card ${cls}"><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
 
   const sheets = Object.keys(SHEET_CONFIG);
   let rowsHtml = '';
   sheets.forEach(s=>{
     const rows = resultRows.filter(r=>r.sheet===s);
-    if(!rows.length) return;
     rowsHtml += `<tr>
-      <td>${s}</td>
-      <td>${rows.length}</td>
+      <td>${s}</td><td>${rows.length}</td>
       <td>${rows.filter(r=>r.evolution==='nouveau').length}</td>
       <td>${rows.filter(r=>r.evolution==='progressé').length}</td>
       <td>${rows.filter(r=>r.evolution==='stagnant').length}</td>
@@ -500,19 +518,24 @@ function renderIndicateurs(dateStr){
   document.getElementById('breakdownTable').innerHTML = `
     <thead><tr><th>Projet / feuille</th><th>Total</th><th>Nouveaux</th><th>Progressés</th><th>Stagnants</th><th>Terminés</th><th>Urgents</th></tr></thead>
     <tbody>${rowsHtml}</tbody>`;
+
+  document.getElementById('indicEmptyNote').style.display = total === 0 ? '' : 'none';
+  document.getElementById('indicFullNote').style.display = total === 0 ? 'none' : '';
 }
 
-// ---------------- RENDER TABLEAUX ----------------
 const TABS = [
-  { key:'tous', label:'Tous' },
-  { key:'nouveau', label:'Nouveaux' },
-  { key:'progressé', label:'Progressés' },
-  { key:'stagnant', label:'Stagnants' },
-  { key:'terminé', label:'Terminés' },
-  { key:'multilots', label:'Multi-lots' },
+  { key:'tous', label:'Tous' }, { key:'nouveau', label:'Nouveaux' },
+  { key:'progressé', label:'Progressés' }, { key:'stagnant', label:'Stagnants' },
+  { key:'terminé', label:'Terminés' }, { key:'multilots', label:'Multi-lots' },
 ];
-
 function renderTables(){
+  if(!resultRows.length){
+    document.getElementById('tableauxEmpty').style.display = '';
+    document.getElementById('tableauxContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('tableauxEmpty').style.display = 'none';
+  document.getElementById('tableauxContent').style.display = '';
   const counts = {
     tous: resultRows.length,
     nouveau: resultRows.filter(r=>r.evolution==='nouveau').length,
@@ -522,14 +545,12 @@ function renderTables(){
     multilots: resultRows.filter(r=>r.isMulti).length,
   };
   document.getElementById('tabsRow').innerHTML = TABS.map(t =>
-    `<div class="tab ${t.key===currentTab?'active':''}" data-tab="${t.key}">${t.label} <span class="n">${counts[t.key]}</span></div>`
-  ).join('');
+    `<div class="tab ${t.key===currentTab?'active':''}" data-tab="${t.key}">${t.label} <span class="n">${counts[t.key]}</span></div>`).join('');
   document.querySelectorAll('.tab').forEach(el=>{
     el.addEventListener('click', ()=>{ currentTab = el.dataset.tab; renderTables(); });
   });
   renderDataTable();
 }
-
 function renderDataTable(){
   const el = document.getElementById('dataTable');
   let rows;
@@ -538,37 +559,30 @@ function renderDataTable(){
   else rows = resultRows.filter(r=>r.evolution===currentTab);
 
   if(!rows.length){
-    el.innerHTML = `<tbody><tr><td><div class="empty"><div class="icon">–</div>Aucun OF dans cette catégorie.</div></td></tr></tbody>`;
+    el.innerHTML = `<tbody><tr><td><div class="empty">Aucun OF dans cette catégorie.</div></td></tr></tbody>`;
     return;
   }
-
   if(currentTab === 'multilots'){
     let body = '';
     rows.forEach(r=>{
-      const lots = multiLotsDetail.filter(l=>l.OF===r.OF);
-      lots.forEach(l=>{
-        body += `<tr>
-          <td>${r.OF}</td><td>${r.sheet}</td><td>Lot ${l.lotNum}</td>
-          <td>${l.phase}</td><td>${l.phaseNum ?? ''}</td><td>${l.qte ?? ''}</td>
-          <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td>
-        </tr>`;
+      multiLotsDetail.filter(l=>l.OF===r.OF).forEach(l=>{
+        body += `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>Lot ${l.lotNum}</td><td>${l.phase}</td>
+          <td>${l.phaseNum ?? ''}</td><td>${l.qte ?? ''}</td>
+          <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`;
       });
     });
     el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Lot</th><th>Phase</th><th>N° Phase</th><th>Qté</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     return;
   }
-
-  const body = rows.map(r => `<tr>
-    <td>${r.OF}</td>
-    <td>${r.sheet}</td>
+  const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
     <td>${r.statut}${r.isMulti ? ' <span class="badge multi">multi-lots</span>' : ''}</td>
-    <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td>
-  </tr>`).join('');
+    <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
   el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
-// ---------------- INIT ----------------
 loadHistorique();
+loadLastResults();
+if(!resultRows.length){ renderIndicateurs(null); renderTables(); }
 </script>
 </body>
 </html>
