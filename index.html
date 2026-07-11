@@ -380,6 +380,10 @@ section.panel{
 .card-icon .icon{width:20px;height:20px}
 .card .num{font-size:40px;font-weight:750;letter-spacing:-.02em}
 .card .lbl{font-size:13px;margin:7px 0 0;color:#c4d3e2}
+.delta{ display:inline-block; font-size:11px; font-weight:600; margin-top:5px; }
+.delta.good{ color:#2ea38f; }
+.delta.bad{ color:#ff4545; }
+.delta.neutral{ color:#66839e; }
 .card .bar{display:none}
 .card:hover{transform:translateY(-2px);transition:.18s ease;box-shadow:0 12px 26px rgba(0,0,0,.26)}
 .breakdown{margin-top:28px;border:1px solid #163a58;border-radius:8px;overflow:hidden;background:rgba(3,16,28,.38)}
@@ -411,10 +415,43 @@ section.panel{
   .hero .sub{max-width:88%}
   section.panel{padding:18px}
 }
+
+.alert-toast{
+  position:fixed; top:20px; right:24px; z-index:999; max-width:360px;
+  background:linear-gradient(145deg,rgba(9,31,49,.98),rgba(7,25,41,.98));
+  border:1px solid #1da1ff; border-radius:10px; padding:14px 16px 14px 18px;
+  box-shadow:0 12px 32px rgba(0,0,0,.4), 0 0 20px rgba(21,149,255,.15);
+  display:flex; align-items:flex-start; gap:10px; color:#edf5ff; font-size:13px; line-height:1.5;
+  animation:toastIn .25s ease;
+}
+@keyframes toastIn{ from{ opacity:0; transform:translateY(-8px);} to{opacity:1; transform:translateY(0);} }
+.alert-toast button{ background:transparent; border:none; color:#7691aa; cursor:pointer; font-size:13px; margin-left:auto; padding:0 0 0 8px; }
+.alert-toast button:hover{ color:#edf5ff; }
+
+@media print{
+  .sidebar, .stepper, #ofSearchPanel, .cta-row, .hist-actions, .alert-toast,
+  .upload-actions, .btn { display:none !important; }
+  body{ background:#fff !important; color:#000 !important; }
+  .main{ padding:0; }
+  section.panel{ background:#fff !important; border:1px solid #ccc !important; box-shadow:none !important; color:#000 !important; }
+  .card{ background:#f5f5f5 !important; border:1px solid #ccc !important; box-shadow:none !important; }
+  .card .num, .card .lbl, .panel-head h2{ color:#000 !important; }
+  .hero{ background:#fff !important; border-bottom:1px solid #ccc !important; }
+  .hero h1, .hero .sub, .eyebrow{ color:#000 !important; }
+  .hero-illus, .hero-watermark{ display:none !important; }
+  .page{ display:none !important; }
+  .page.active{ display:block !important; }
+  table.data, .breakdown table{ color:#000 !important; }
+  table th, table td{ color:#000 !important; border-color:#ccc !important; }
+}
 </style>
 
 </head>
 <body>
+<div id="alertToast" class="alert-toast" style="display:none;">
+  <div id="alertToastMsg"></div>
+  <button id="alertToastClose" aria-label="Fermer">✕</button>
+</div>
 <div class="app-shell">
 
   <aside class="sidebar">
@@ -484,7 +521,10 @@ section.panel{
     <section class="panel">
       <div class="panel-head">
         <h2>Indicateurs du jour</h2>
-        <span class="count" id="indicDate"></span>
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span class="count" id="indicDate"></span>
+          <button class="btn ghost" id="printSummaryBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="1"/><path d="M6 17v4h12v-4"/></svg> Résumé imprimable</button>
+        </div>
       </div>
       <div class="cards" id="cardsRow"></div>
       <div class="breakdown">
@@ -905,6 +945,24 @@ function loadDailyLog(){
   try{ const raw = localStorage.getItem(DAILY_LOG_KEY); return raw ? JSON.parse(raw) : {}; }
   catch(e){ return {}; }
 }
+function getPreviousDayEntry(dateStr){
+  const log = loadDailyLog();
+  const prevDates = Object.keys(log).filter(d => d < dateStr).sort();
+  if(!prevDates.length) return null;
+  return log[prevDates[prevDates.length - 1]];
+}
+function deltaBadge(curr, prev, goodDirection){
+  if(prev === null || prev === undefined) return '';
+  const diff = Math.round((curr - prev) * 10) / 10;
+  if(diff === 0) return `<span class="delta neutral">— vs hier</span>`;
+  const up = diff > 0;
+  let cls = 'neutral';
+  if(goodDirection === 'up') cls = up ? 'good' : 'bad';
+  else if(goodDirection === 'down') cls = up ? 'bad' : 'good';
+  const arrow = up ? '▲' : '▼';
+  const sign = up ? '+' : '';
+  return `<span class="delta ${cls}">${arrow} ${sign}${diff} vs hier</span>`;
+}
 function saveDailyLogEntry(dateStr, snapshot){
   const log = loadDailyLog();
   log[dateStr] = snapshot;
@@ -1024,6 +1082,8 @@ function traiter(){
 
   const enRetard = allRows.filter(r=>r.retardJours!==null);
   const bloques = allRows.filter(r=>r.isBlocked);
+  const sansMvt48Count = allRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).length;
+  const retardMoyenVal = enRetard.length ? (enRetard.reduce((s,r)=>s+r.retardJours,0)/enRetard.length) : 0;
 
   saveDailyLogEntry(dateStr, {
     total: allRows.length,
@@ -1034,6 +1094,10 @@ function traiter(){
     urgents: allRows.filter(r=>r.urgent).length,
     enRetard: enRetard.length,
     bloques: bloques.length,
+    multiLots: allRows.filter(r=>r.isMulti).length,
+    tauxRetard: allRows.length ? Math.round((enRetard.length/allRows.length)*100) : 0,
+    retardMoyen: retardMoyenVal,
+    sansMvt48: sansMvt48Count,
   });
 
   renderIndicateurs(dateStr);
@@ -1045,6 +1109,7 @@ document.getElementById('processBtn').addEventListener('click', traiter);
 
 function renderIndicateurs(dateStr){
   document.getElementById('indicDate').textContent = dateStr || '';
+  const prev = dateStr ? getPreviousDayEntry(dateStr) : null;
 
   const total = resultRows.length;
   const nouveaux = resultRows.filter(r=>r.evolution==='nouveau').length;
@@ -1055,12 +1120,17 @@ function renderIndicateurs(dateStr){
   const multi = resultRows.filter(r=>r.isMulti).length;
 
   const cards = [
-    ['c-total','clipboard-list','Total OF suivis', total], ['c-nouv','file-plus','Nouveaux OF', nouveaux],
-    ['c-prog','trending-up','Progressés', progresses], ['c-stag','clock-pause','Stagnants', stagnants],
-    ['c-term','check','Terminés', termines], ['c-urg','alert-triangle','Urgents', urgents], ['c-multi','box','Multi-lots', multi],
+    ['c-total','clipboard-list','Total OF suivis', total, 'total', 'neutral'],
+    ['c-nouv','file-plus','Nouveaux OF', nouveaux, 'nouveaux', 'neutral'],
+    ['c-prog','trending-up','Progressés', progresses, 'progresses', 'up'],
+    ['c-stag','clock-pause','Stagnants', stagnants, 'stagnants', 'down'],
+    ['c-term','check','Terminés', termines, 'termines', 'up'],
+    ['c-urg','alert-triangle','Urgents', urgents, 'urgents', 'down'],
+    ['c-multi','box','Multi-lots', multi, 'multiLots', 'neutral'],
   ];
-  document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val])=>
-    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div><div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
+  document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir])=>
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}<div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
+  window.__prevDayEntry = prev;
 
   const sheetIcons = { "P1 Assemblage":"plane", "P1 client":"settings", "Latecoere":"link" };
   const sheets = Object.keys(SHEET_CONFIG);
@@ -1088,14 +1158,14 @@ function renderIndicateurs(dateStr){
   const sansMvt48 = resultRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).length;
 
   const advCards = [
-    ['c-urg','clock-alert','OF en retard', enRetardRows.length],
-    ['c-urg','percentage','Taux de retard', tauxRetard + '%'],
-    ['c-stag','calendar-time','Retard moyen', retardMoyen + ' j'],
-    ['c-bloque','lock','OF bloqués', bloquesRows.length],
-    ['c-sansmvt','pulse-off','Sans mouvement +48h', sansMvt48],
+    ['c-urg','clock-alert','OF en retard', enRetardRows.length, enRetardRows.length, 'enRetard', 'down'],
+    ['c-urg','percentage','Taux de retard', tauxRetard + '%', tauxRetard, 'tauxRetard', 'down'],
+    ['c-stag','calendar-time','Retard moyen', retardMoyen + ' j', parseFloat(retardMoyen), 'retardMoyen', 'down'],
+    ['c-bloque','lock','OF bloqués', bloquesRows.length, bloquesRows.length, 'bloques', 'down'],
+    ['c-sansmvt','pulse-off','Sans mouvement +48h', sansMvt48, sansMvt48, 'sansMvt48', 'down'],
   ];
-  document.getElementById('advCardsRow').innerHTML = advCards.map(([cls,ico,lbl,val])=>
-    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
+  document.getElementById('advCardsRow').innerHTML = advCards.map(([cls,ico,lbl,disp,rawVal,key,dir])=>
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${disp}</div><div class="lbl">${lbl}</div>${deltaBadge(rawVal, window.__prevDayEntry ? window.__prevDayEntry[key] : null, dir)}</div>`).join('');
 
   document.getElementById('indicEmptyNote').style.display = total === 0 ? '' : 'none';
   document.getElementById('indicFullNote').style.display = total === 0 ? 'none' : '';
@@ -1263,9 +1333,44 @@ function ofSearch(query){
 }
 document.getElementById('ofSearchInput').addEventListener('input', (e) => ofSearch(e.target.value));
 
+document.getElementById('printSummaryBtn').addEventListener('click', ()=>{
+  goToPage('indicateurs');
+  setTimeout(()=> window.print(), 80);
+});
+
+function showAlertToast(msg){
+  document.getElementById('alertToastMsg').innerHTML = msg;
+  document.getElementById('alertToast').style.display = 'flex';
+}
+document.getElementById('alertToastClose').addEventListener('click', ()=>{
+  document.getElementById('alertToast').style.display = 'none';
+});
+
+function checkOpeningAlert(){
+  if(!resultRows.length || !lastDateStr) return;
+  const prev = getPreviousDayEntry(lastDateStr);
+  const urgents = resultRows.filter(r=>r.urgent).length;
+  const enRetard = resultRows.filter(r=>r.retardJours!==null).length;
+  const bloques = resultRows.filter(r=>r.isBlocked).length;
+  const nouveaux = resultRows.filter(r=>r.evolution==='nouveau').length;
+
+  let parts = [];
+  if(prev){
+    const dB = bloques - (prev.bloques||0);
+    const dR = enRetard - (prev.enRetard||0);
+    if(dB > 0) parts.push(`+${dB} OF bloqué${dB>1?'s':''} depuis hier`);
+    if(dR > 0) parts.push(`+${dR} OF en retard depuis hier`);
+  }
+  if(!parts.length){
+    parts.push(`${urgents} urgents · ${enRetard} en retard · ${bloques} bloqués · ${nouveaux} nouveaux`);
+  }
+  showAlertToast(`<strong>⚠ Résumé du ${lastDateStr} :</strong><br>${parts.join(' · ')}`);
+}
+
 loadHistorique();
 loadLastResults();
 if(!resultRows.length){ renderIndicateurs(null); renderTables(); }
+else { checkOpeningAlert(); }
 </script>
 </body>
 </html>
