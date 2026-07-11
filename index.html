@@ -708,17 +708,19 @@ function traiter(){
     for(const r of rows){
       const { statut, isMulti, lots, dateExp, comment } = determinerStatut(r.OF, erpMap, historique, r.statutExistant);
       const ancien = historique[r.OF];
+      const estTermine = statut === 'terminé';
       let evolution;
-      if(!ancien) evolution = 'nouveau';
+      if(estTermine) evolution = 'terminé';
+      else if(!ancien) evolution = 'nouveau';
       else if(ancien.statut === statut) evolution = 'stagnant';
-      else evolution = (statut === 'terminé') ? 'terminé' : 'progressé';
+      else evolution = 'progressé';
 
       const finalComment = r.commentaireCol || comment || null;
-      const isBlocked = !!finalComment && evolution !== 'terminé';
+      const isBlocked = !!finalComment && !estTermine;
       const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
       let retardJours = null;
-      if(r.dateAssignee && evolution !== 'terminé'){
+      if(r.dateAssignee && !estTermine){
         const diff = daysBetween(today, r.dateAssignee);
         if(diff > 0) retardJours = diff;
       }
