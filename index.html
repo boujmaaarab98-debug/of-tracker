@@ -130,6 +130,8 @@
   .card.c-term .card-icon{ background:#2a333c; color:#c2c6cc; } .card.c-term .num{ color:#c2c6cc; } .card.c-term .bar span{ background:#8a8f98; }
   .card.c-urg .card-icon{ background:var(--red-dim); color:var(--red); } .card.c-urg .num{ color:var(--red); } .card.c-urg .bar span{ background:var(--red); }
   .card.c-multi .card-icon{ background:#233542; color:#7fa3bd; } .card.c-multi .num{ color:#a7c3d6; } .card.c-multi .bar span{ background:#4c7ea8; }
+  .card.c-bloque .card-icon{ background:var(--red-dim); color:var(--red); } .card.c-bloque .num{ color:var(--red); } .card.c-bloque .bar span{ background:var(--red); }
+  .card.c-sansmvt .card-icon{ background:var(--amber-dim); color:var(--amber); } .card.c-sansmvt .num{ color:var(--amber); } .card.c-sansmvt .bar span{ background:var(--amber); }
 
   .breakdown{ margin-top:20px; }
   .breakdown table{ width:100%; border-collapse:collapse; font-size:12.5px; }
@@ -226,6 +228,10 @@
         <span class="status-msg">Ces chiffres sont à 0 tant qu'aucun fichier n'a été traité.</span>
         <button class="btn primary" id="goToFichiersBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M4 21h16"/></svg> Importer les fichiers <svg class="icon" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M14 6l6 6-6 6"/></svg></button>
       </div>
+    </section>
+    <section class="panel" id="panel-avance">
+      <div class="panel-head"><h2>Indicateurs avancés (performance)</h2></div>
+      <div class="cards" id="advCardsRow"></div>
       <div id="indicFullNote" class="cta-row" style="display:none;">
         <button class="btn primary" id="goToTableauxBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5"/><path d="M21 3 15 21l-4.5-7.5L3 9Z"/></svg> Voir le détail par OF <svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
       </div>
@@ -343,6 +349,11 @@ const ICONS = {
   'settings': '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
   'link': '<path d="M8 12a4 4 0 0 1 4-4h2a4 4 0 0 1 0 8h-1"/><path d="M16 12a4 4 0 0 1-4 4H10a4 4 0 0 1 0-8h1"/>',
   'folder': '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z"/>',
+  'clock-alert': '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l2.5 1.5"/><circle cx="12" cy="18.5" r="0.6" fill="currentColor" stroke="none"/>',
+  'percentage': '<circle cx="7" cy="7" r="2.3"/><circle cx="17" cy="17" r="2.3"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  'calendar-time': '<rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><circle cx="15.5" cy="15.5" r="3.2"/><path d="M15.5 14v1.5l1 .8"/>',
+  'lock': '<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>',
+  'pulse-off': '<path d="M3 12h4l2 6 4-12 2 6h6"/>',
 };
 function svgIcon(name){ return `<svg class="icon" viewBox="0 0 24 24">${ICONS[name] || ''}</svg>`; }
 
@@ -477,6 +488,18 @@ document.getElementById('importHistFile').addEventListener('change', (e)=>{
   reader.readAsText(f);
 });
 
+function excelDateToJs(value){
+  if(value === null || value === undefined || value === '') return null;
+  if(typeof value === 'number'){
+    const ms = Math.round((value - 25569) * 86400 * 1000);
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
+
 function parseERP(wb){
   const sheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
@@ -489,6 +512,7 @@ function parseERP(wb){
   const idxLibelle = idxNPhase >= 0 ? idxNPhase + 1 : headers.findIndex(h=>h.includes('libellé'));
   const idxCmde = headers.indexOf('cmde client');
   const idxQte = headers.findIndex(h => h.includes('traiter'));
+  const idxDateExp = headers.findIndex(h => h.includes('expéd'));
 
   const map = {};
   for(let i=1;i<rows.length;i++){
@@ -502,6 +526,7 @@ function parseERP(wb){
       phaseNum: idxNPhase>=0 && row[idxNPhase]!==null ? Number(row[idxNPhase]) : null,
       phaseLibelle: idxLibelle>=0 && row[idxLibelle]!==null ? String(row[idxLibelle]).trim() : '',
       qte: idxQte>=0 ? row[idxQte] : null,
+      dateExp: idxDateExp>=0 ? excelDateToJs(row[idxDateExp]) : null,
     };
     if(!map[ofNum]) map[ofNum] = [];
     map[ofNum].push(lot);
@@ -514,15 +539,19 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant){
   if(lots && lots.length){
     const remplis = lots.filter(l => qteEstRemplie(l.qte));
     const effectifs = remplis.length > 0 ? remplis : lots;
-    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs };
+    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs, dateExp: effectifs[0].dateExp, comment:null };
     const avecNum = effectifs.filter(l => l.phaseNum !== null && !isNaN(l.phaseNum));
     const bottleneck = avecNum.length ? avecNum.reduce((a,b)=> a.phaseNum <= b.phaseNum ? a : b) : effectifs[0];
-    return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs };
+    return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs, dateExp: bottleneck.dateExp, comment:null };
   }
   const ancien = historiqueLocal[ofNum];
-  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[] };
-  if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))) return { statut: String(statutExistant).trim(), isMulti:false, lots:[] };
-  return { statut:'non reçu', isMulti:false, lots:[] };
+  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[], dateExp:null, comment:null };
+  if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))){
+    const txt = String(statutExistant).trim();
+    const estTermine = /termin/i.test(txt);
+    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estTermine ? null : txt };
+  }
+  return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null };
 }
 
 function parseClientSheet(wb, sheetName, cfg){
@@ -533,6 +562,7 @@ function parseClientSheet(wb, sheetName, cfg){
   const headers = rows[0].map(norm);
   const idxOF = headers.indexOf(cfg.ofCol);
   const idxStatut = headers.indexOf('statut');
+  const idxCommentaire = headers.indexOf('commentaire');
   const idxUrgence = cfg.urgenceCol ? headers.indexOf(cfg.urgenceCol) : -1;
   if(idxOF === -1) return [];
   const out = [];
@@ -546,7 +576,8 @@ function parseClientSheet(wb, sheetName, cfg){
     if(cfg.urgenceMode === 'tout_urgent'){ urgent = true; }
     else { const v = idxUrgence>=0 ? row[idxUrgence] : null; urgent = v !== null && v !== undefined && String(v).trim() !== ''; }
     const statutExistant = idxStatut>=0 ? row[idxStatut] : null;
-    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant });
+    const commentaireCol = idxCommentaire>=0 && row[idxCommentaire] ? String(row[idxCommentaire]).trim() : '';
+    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, commentaireCol });
   }
   return out;
 }
@@ -622,30 +653,51 @@ document.getElementById('graphTo').addEventListener('change', renderGraphiques);
 function traiter(){
   setStatus("Traitement en cours…", false);
   const erpMap = parseERP(erpWB);
+  const dateStr = document.getElementById('heroDateInput').value;
+  const today = new Date(dateStr + 'T00:00:00');
+
   let allRows = [];
   let multiLots = [];
   for(const [sheetName, cfg] of Object.entries(SHEET_CONFIG)){
     const rows = parseClientSheet(clientWB, sheetName, cfg);
     for(const r of rows){
-      const { statut, isMulti, lots } = determinerStatut(r.OF, erpMap, historique, r.statutExistant);
+      const { statut, isMulti, lots, dateExp, comment } = determinerStatut(r.OF, erpMap, historique, r.statutExistant);
       const ancien = historique[r.OF];
       let evolution;
       if(!ancien) evolution = 'nouveau';
       else if(ancien.statut === statut) evolution = 'stagnant';
       else evolution = (statut === 'terminé') ? 'terminé' : 'progressé';
-      allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution });
+
+      const finalComment = r.commentaireCol || comment || null;
+      const isBlocked = !!finalComment && evolution !== 'terminé';
+
+      let retardJours = null;
+      if(dateExp && evolution !== 'terminé'){
+        const diff = daysBetween(today, dateExp);
+        if(diff > 0) retardJours = diff;
+      }
+
+      let sinceDate = dateStr;
+      if(ancien && ancien.statut === statut && ancien.since) sinceDate = ancien.since;
+      const sansMouvementJours = daysBetween(today, new Date(sinceDate + 'T00:00:00'));
+
+      allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
+        comment: finalComment, isBlocked, retardJours, since: sinceDate, sansMouvementJours });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
   resultRows = allRows;
   multiLotsDetail = multiLots;
-
-  const dateStr = document.getElementById('heroDateInput').value;
   lastDateStr = dateStr;
+
   const newHist = Object.assign({}, historique);
-  allRows.forEach(r => { newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr }; });
+  allRows.forEach(r => { newHist[r.OF] = { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since }; });
   saveHistorique(newHist);
   saveLastResults(dateStr);
+
+  const enRetard = allRows.filter(r=>r.retardJours!==null);
+  const bloques = allRows.filter(r=>r.isBlocked);
+
   saveDailyLogEntry(dateStr, {
     total: allRows.length,
     nouveaux: allRows.filter(r=>r.evolution==='nouveau').length,
@@ -653,6 +705,8 @@ function traiter(){
     stagnants: allRows.filter(r=>r.evolution==='stagnant').length,
     termines: allRows.filter(r=>r.evolution==='terminé').length,
     urgents: allRows.filter(r=>r.urgent).length,
+    enRetard: enRetard.length,
+    bloques: bloques.length,
   });
 
   renderIndicateurs(dateStr);
@@ -700,6 +754,22 @@ function renderIndicateurs(dateStr){
     <thead><tr><th>Projet / feuille</th><th>Total</th><th>Nouveaux</th><th>Progressés</th><th>Stagnants</th><th>Terminés</th><th>Urgents</th></tr></thead>
     <tbody>${rowsHtml}</tbody>`;
 
+  const enRetardRows = resultRows.filter(r=>r.retardJours!==null);
+  const tauxRetard = total ? Math.round((enRetardRows.length/total)*100) : 0;
+  const retardMoyen = enRetardRows.length ? (enRetardRows.reduce((s,r)=>s+r.retardJours,0)/enRetardRows.length).toFixed(1) : '0';
+  const bloquesRows = resultRows.filter(r=>r.isBlocked);
+  const sansMvt48 = resultRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).length;
+
+  const advCards = [
+    ['c-urg','clock-alert','OF en retard', enRetardRows.length],
+    ['c-urg','percentage','Taux de retard', tauxRetard + '%'],
+    ['c-stag','calendar-time','Retard moyen', retardMoyen + ' j'],
+    ['c-bloque','lock','OF bloqués', bloquesRows.length],
+    ['c-sansmvt','pulse-off','Sans mouvement +48h', sansMvt48],
+  ];
+  document.getElementById('advCardsRow').innerHTML = advCards.map(([cls,ico,lbl,val])=>
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
+
   document.getElementById('indicEmptyNote').style.display = total === 0 ? '' : 'none';
   document.getElementById('indicFullNote').style.display = total === 0 ? 'none' : '';
 }
@@ -708,6 +778,7 @@ const TABS = [
   { key:'tous', label:'Tous' }, { key:'nouveau', label:'Nouveaux' },
   { key:'progressé', label:'Progressés' }, { key:'stagnant', label:'Stagnants' },
   { key:'terminé', label:'Terminés' }, { key:'multilots', label:'Multi-lots' },
+  { key:'retard', label:'En retard' }, { key:'bloque', label:'Bloqués' },
 ];
 function renderTables(){
   if(!resultRows.length){
@@ -724,6 +795,8 @@ function renderTables(){
     stagnant: resultRows.filter(r=>r.evolution==='stagnant').length,
     terminé: resultRows.filter(r=>r.evolution==='terminé').length,
     multilots: resultRows.filter(r=>r.isMulti).length,
+    retard: resultRows.filter(r=>r.retardJours!==null).length,
+    bloque: resultRows.filter(r=>r.isBlocked).length,
   };
   document.getElementById('tabsRow').innerHTML = TABS.map(t =>
     `<div class="tab ${t.key===currentTab?'active':''}" data-tab="${t.key}">${t.label} <span class="n">${counts[t.key]}</span></div>`).join('');
@@ -737,10 +810,26 @@ function renderDataTable(){
   let rows;
   if(currentTab === 'tous') rows = resultRows;
   else if(currentTab === 'multilots') rows = resultRows.filter(r=>r.isMulti);
+  else if(currentTab === 'retard') rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours);
+  else if(currentTab === 'bloque') rows = resultRows.filter(r=>r.isBlocked);
   else rows = resultRows.filter(r=>r.evolution===currentTab);
 
   if(!rows.length){
     el.innerHTML = `<tbody><tr><td><div class="empty">Aucun OF dans cette catégorie.</div></td></tr></tbody>`;
+    return;
+  }
+  if(currentTab === 'retard'){
+    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.statut}</td>
+      <td style="color:var(--red); font-weight:700;">${r.retardJours} j</td>
+      <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    return;
+  }
+  if(currentTab === 'bloque'){
+    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
+      <td style="color:var(--red);">${r.comment}</td>
+      <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Commentaire / blocage</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     return;
   }
   if(currentTab === 'multilots'){
