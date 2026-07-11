@@ -73,6 +73,22 @@
   .stepper .nav-item.active{ color:var(--text); }
   .stepper .connector{ flex:0 0 26px; height:0; border-top:1.5px dashed var(--border); margin:0 2px; }
 
+  /* ---- OF SEARCH ---- */
+  #ofSearchPanel{ margin-bottom:24px; }
+  .search-row{ display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid var(--border); border-radius:9px; padding:10px 14px; }
+  .search-row .icon{ color:var(--text-faint); width:17px; height:17px; flex-shrink:0; }
+  .search-row input{ flex:1; background:transparent; border:none; outline:none; color:var(--text); font-size:14px; }
+  .search-row input::placeholder{ color:var(--text-faint); }
+  #ofSearchResults{ margin-top:14px; }
+  .of-card{ background:var(--panel-2); border:1px solid var(--border-soft); border-radius:10px; padding:16px 18px; margin-bottom:10px; }
+  .of-card .of-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px; }
+  .of-card .of-num{ font-size:18px; font-weight:700; color:var(--steel); }
+  .of-card .of-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
+  .of-card .of-field .lbl{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); margin-bottom:3px; }
+  .of-card .of-field .val{ font-size:13.5px; color:var(--text); font-weight:600; }
+  .of-card .of-comment{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border-soft); font-size:13px; color:var(--red); }
+  .of-search-empty{ color:var(--text-faint); font-size:13px; padding:6px 2px; }
+
   /* ---- MAIN / HERO ---- */
   .main{ flex:1; min-width:0; padding:0 28px 80px; position:relative; }
   .main::before{
@@ -295,6 +311,14 @@
         <div class="connector"></div>
         <div class="nav-item" data-page="historique"><span class="n">5</span> Historique</div>
       </div>
+
+      <section class="panel" id="ofSearchPanel">
+        <div class="search-row">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+          <input type="text" id="ofSearchInput" placeholder="Chercher un OF (numéro)…" autocomplete="off">
+        </div>
+        <div id="ofSearchResults"></div>
+      </section>
 
 
   <div class="page active" id="page-indicateurs">
@@ -1044,6 +1068,41 @@ function renderDataTable(){
     <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
   el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
+
+function ofSearch(query){
+  const box = document.getElementById('ofSearchResults');
+  const q = query.trim();
+  if(!q){ box.innerHTML = ''; return; }
+  const matches = resultRows.filter(r => r.OF.includes(q)).slice(0, 8);
+  if(!matches.length){
+    box.innerHTML = `<div class="of-search-empty">Aucun OF trouvé pour "${q}".</div>`;
+    return;
+  }
+  box.innerHTML = matches.map(r => {
+    const lots = r.isMulti ? multiLotsDetail.filter(l=>l.OF===r.OF) : [];
+    const lotsHtml = lots.length ? `<div class="of-comment" style="color:var(--text-dim);">
+      <strong style="color:var(--text);">Multi-lots :</strong> ${lots.map(l=>`Lot ${l.lotNum} — ${l.phase} (qté ${l.qte ?? '?'})`).join(' · ')}
+    </div>` : '';
+    const commentHtml = r.comment ? `<div class="of-comment">⚠ ${r.comment}</div>` : '';
+    const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant', terminé:'Terminé' }[r.evolution] || r.evolution;
+    return `<div class="of-card">
+      <div class="of-head">
+        <span class="of-num">OF ${r.OF}</span>
+        ${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}
+      </div>
+      <div class="of-grid">
+        <div class="of-field"><div class="lbl">Projet</div><div class="val">${r.sheet}</div></div>
+        <div class="of-field"><div class="lbl">Statut</div><div class="val">${r.statut}</div></div>
+        <div class="of-field"><div class="lbl">Évolution</div><div class="val">${evoLabel}</div></div>
+        <div class="of-field"><div class="lbl">Date donnée</div><div class="val">${r.dateAssigneeStr || '—'}</div></div>
+        <div class="of-field"><div class="lbl">Retard</div><div class="val" style="${r.retardJours?'color:var(--red);':''}">${r.retardJours ? r.retardJours + ' j' : '—'}</div></div>
+        <div class="of-field"><div class="lbl">Statut inchangé depuis</div><div class="val">${r.since || '—'}</div></div>
+      </div>
+      ${commentHtml}${lotsHtml}
+    </div>`;
+  }).join('');
+}
+document.getElementById('ofSearchInput').addEventListener('input', (e) => ofSearch(e.target.value));
 
 loadHistorique();
 loadLastResults();
