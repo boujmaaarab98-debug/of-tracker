@@ -276,6 +276,7 @@
       </div>
       <div id="tableauxContent">
         <div class="tabs" id="tabsRow"></div>
+        <div id="blocageCatBar" style="display:none; margin-bottom:14px;"></div>
         <div class="table-scroll">
           <table class="data" id="dataTable"></table>
         </div>
@@ -500,6 +501,23 @@ function excelDateToJs(value){
 }
 function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
 
+const CATEGORIES_BLOCAGE = [
+  { key:'methode', label:'Méthode', keywords:['méthode','methode','method'] },
+  { key:'litige', label:'Litige', keywords:['litige'] },
+  { key:'qualite', label:'Qualité', keywords:['qualité','qualite','défaut','defaut','non conforme',' nc '] },
+  { key:'matiere', label:'Matière / Appro', keywords:['matière','matiere','stock','appro','approvisionnement'] },
+  { key:'outillage', label:'Outillage', keywords:['outillage','outil','gabarit'] },
+  { key:'machine', label:'Machine', keywords:['machine','panne'] },
+  { key:'document', label:'Document', keywords:['document','plan','dossier','dessin'] },
+];
+function classifierCommentaire(text){
+  const t = ' ' + norm(text) + ' ';
+  for(const cat of CATEGORIES_BLOCAGE){
+    if(cat.keywords.some(k => t.includes(k))) return cat.label;
+  }
+  return 'Autre';
+}
+
 function parseERP(wb){
   const sheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
@@ -670,6 +688,7 @@ function traiter(){
 
       const finalComment = r.commentaireCol || comment || null;
       const isBlocked = !!finalComment && evolution !== 'terminé';
+      const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
       let retardJours = null;
       if(dateExp && evolution !== 'terminé'){
@@ -682,7 +701,7 @@ function traiter(){
       const sansMouvementJours = daysBetween(today, new Date(sinceDate + 'T00:00:00'));
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
-        comment: finalComment, isBlocked, retardJours, since: sinceDate, sansMouvementJours });
+        comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -807,6 +826,7 @@ function renderTables(){
 }
 function renderDataTable(){
   const el = document.getElementById('dataTable');
+  document.getElementById('blocageCatBar').style.display = 'none';
   let rows;
   if(currentTab === 'tous') rows = resultRows;
   else if(currentTab === 'multilots') rows = resultRows.filter(r=>r.isMulti);
@@ -826,10 +846,17 @@ function renderDataTable(){
     return;
   }
   if(currentTab === 'bloque'){
+    const parCat = {};
+    rows.forEach(r => { parCat[r.category] = (parCat[r.category]||0) + 1; });
+    const catBadges = Object.entries(parCat).sort((a,b)=>b[1]-a[1])
+      .map(([cat,n]) => `<span class="badge multi" style="margin:0 6px 6px 0; font-size:11.5px; padding:4px 10px;">${cat} · ${n}</span>`).join('');
     const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
+      <td><span class="badge urgent" style="background:#2a3644; color:#8fb3cc;">${r.category}</span></td>
       <td style="color:var(--red);">${r.comment}</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Commentaire / blocage</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    document.getElementById('blocageCatBar').innerHTML = catBadges;
+    document.getElementById('blocageCatBar').style.display = '';
     return;
   }
   if(currentTab === 'multilots'){
