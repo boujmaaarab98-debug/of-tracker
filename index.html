@@ -849,6 +849,28 @@ function excelDateToJs(value){
   return isNaN(d.getTime()) ? null : d;
 }
 function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
+function ageValueToHours(raw){
+  if(raw === null || raw === undefined || raw === '') return null;
+  if(typeof raw === 'number' && !isNaN(raw)) return (raw - 1) * 24;
+  if(raw instanceof Date){
+    if(isNaN(raw.getTime())) return null;
+    const serial = raw.getTime() / 86400000 + 25569;
+    return (serial - 1) * 24;
+  }
+  const s = String(raw).trim();
+  let m = s.match(/^1899-12-31[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m) return Number(m[1]) + Number(m[2])/60;
+  m = s.match(/^1900-01-0?(\d+)[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m){
+    const days = Number(m[1]) - 1;
+    return days*24 + Number(m[2]) + Number(m[3])/60;
+  }
+  m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if(m) return Number(m[1]) + Number(m[2])/60;
+  const n = Number(s);
+  if(!isNaN(n) && s !== '') return (n - 1) * 24;
+  return null;
+}
 function formatDureeHeures(heures, joursFallback){
   if(heures === null || heures === undefined){
     return joursFallback !== null && joursFallback !== undefined ? joursFallback + ' j (estimé)' : '—';
@@ -900,12 +922,7 @@ function parseERP(wb){
     if(ofRaw===null || ofRaw===undefined || ofRaw==='') continue;
     const ofNum = String(ofRaw).trim();
     const aogVal = idxAOG>=0 ? row[idxAOG] : null;
-    let ageHeures = null;
-    if(idxAge>=0){
-      const ageRaw = row[idxAge];
-      if(typeof ageRaw === 'number') ageHeures = (ageRaw - 1) * 24;
-      else if(ageRaw instanceof Date) ageHeures = null;
-    }
+    const ageHeures = idxAge>=0 ? ageValueToHours(row[idxAge]) : null;
     const lot = {
       phaseNum: idxNPhase>=0 && row[idxNPhase]!==null ? Number(row[idxNPhase]) : null,
       phaseLibelle: idxLibelle>=0 && row[idxLibelle]!==null ? String(row[idxLibelle]).trim() : '',
