@@ -709,6 +709,17 @@ section.panel{
         exporte-le régulièrement pour ne pas le perdre si tu changes de PC ou de navigateur.
       </div>
     </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2 style="color:var(--red);">Zone dangereuse</h2></div>
+      <p style="font-size:13px; color:var(--text-dim); margin-top:0;">
+        Efface <strong>tout</strong> ce qui a été enregistré par l'outil (historique des statuts,
+        graphiques jour par jour, traçabilité par OF, dernier résultat affiché) — utile pour
+        repartir sur une base propre après une période de test. Après ça, tu traites hier et
+        aujourd'hui normalement et tout redémarre proprement.
+      </p>
+      <button class="btn danger-ghost" id="fullResetBtn">Réinitialisation complète (tout effacer)</button>
+    </section>
   </div>
     </div>
   </main>
@@ -852,6 +863,30 @@ document.getElementById('resetHistBtn').addEventListener('click', ()=>{
   if(!confirm("Réinitialiser l'historique ? Tous les OF redeviendront 'nouveaux' au prochain traitement.")) return;
   saveHistorique({});
   setStatus("Historique réinitialisé.", false);
+});
+document.getElementById('fullResetBtn').addEventListener('click', ()=>{
+  const ok1 = confirm("⚠ Ceci va effacer TOUT (historique, graphiques, traçabilité, dernier résultat). Cette action est irréversible. Continuer ?");
+  if(!ok1) return;
+  const ok2 = confirm("Es-tu sûr ? Toutes les données enregistrées dans ce navigateur seront perdues définitivement.");
+  if(!ok2) return;
+  try{
+    localStorage.removeItem(HISTORY_KEY);
+    localStorage.removeItem(DAILY_LOG_KEY);
+    localStorage.removeItem(TRANSITIONS_KEY);
+    localStorage.removeItem(LAST_RESULTS_KEY);
+  }catch(e){ console.error(e); }
+  historique = {};
+  resultRows = [];
+  multiLotsDetail = [];
+  aogRows = [];
+  lastDateStr = null;
+  renderHistoriquePage();
+  renderIndicateurs(null);
+  renderTables();
+  renderAOG();
+  renderPlanAction();
+  setStatus("Réinitialisation complète effectuée — repars avec hier et aujourd'hui.", false);
+  alert("Tout a été effacé. Tu peux maintenant traiter le fichier d'hier, puis celui d'aujourd'hui, pour repartir sur une base propre.");
 });
 document.getElementById('exportHistBtn').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(historique, null, 2)], { type:'application/json' });
