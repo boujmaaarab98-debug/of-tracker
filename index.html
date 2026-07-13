@@ -87,6 +87,11 @@
   .of-card .of-field .lbl{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); margin-bottom:3px; }
   .of-card .of-field .val{ font-size:13.5px; color:var(--text); font-weight:600; }
   .of-card .of-comment{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border-soft); font-size:13px; color:var(--red); }
+  .of-timeline{ margin-top:12px; padding-top:12px; border-top:1px solid var(--border-soft); }
+  .of-timeline .lbl{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); }
+  .of-timeline-item{ display:flex; gap:10px; align-items:baseline; font-size:12.5px; padding:3px 0; }
+  .of-timeline-date{ color:var(--steel); font-weight:600; flex:0 0 82px; }
+  .of-timeline-statut{ color:var(--text-dim); }
   .of-search-empty{ color:var(--text-faint); font-size:13px; padding:6px 2px; }
 
   /* ---- MAIN / HERO ---- */
@@ -478,6 +483,7 @@ section.panel{
     </div>
     <div class="sidebar-nav">
       <div class="nav-item active" data-page="indicateurs" title="Indicateurs"><svg class="icon" viewBox="0 0 24 24"><path d="M4 15a8 8 0 1 1 16 0"/><line x1="12" y1="15" x2="16" y2="10"/></svg></div>
+      <div class="nav-item" data-page="plan" title="Plan d'action"><svg class="icon" viewBox="0 0 24 24"><polyline points="4 12 9 17 20 6"/></svg></div>
       <div class="nav-item" data-page="graphiques" title="Graphiques"><svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/></svg></div>
       <div class="nav-item" data-page="aog" title="AOG"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="16.3" r="0.6" fill="currentColor" stroke="none"/></svg></div>
       <div class="nav-item" data-page="tableaux" title="Tableaux"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg></div>
@@ -517,15 +523,17 @@ section.panel{
       <div class="stepper">
         <div class="nav-item active" data-page="indicateurs"><span class="n">1</span> Indicateurs</div>
         <div class="connector"></div>
-        <div class="nav-item" data-page="graphiques"><span class="n">2</span> Graphiques</div>
+        <div class="nav-item" data-page="plan"><span class="n">2</span> Plan d'action</div>
         <div class="connector"></div>
-        <div class="nav-item" data-page="aog"><span class="n">3</span> AOG</div>
+        <div class="nav-item" data-page="graphiques"><span class="n">3</span> Graphiques</div>
         <div class="connector"></div>
-        <div class="nav-item" data-page="tableaux"><span class="n">4</span> Tableaux</div>
+        <div class="nav-item" data-page="aog"><span class="n">4</span> AOG</div>
         <div class="connector"></div>
-        <div class="nav-item" data-page="fichiers"><span class="n">5</span> Fichiers</div>
+        <div class="nav-item" data-page="tableaux"><span class="n">5</span> Tableaux</div>
         <div class="connector"></div>
-        <div class="nav-item" data-page="historique"><span class="n">6</span> Historique</div>
+        <div class="nav-item" data-page="fichiers"><span class="n">6</span> Fichiers</div>
+        <div class="connector"></div>
+        <div class="nav-item" data-page="historique"><span class="n">7</span> Historique</div>
       </div>
 
       <section class="panel" id="ofSearchPanel">
@@ -560,6 +568,24 @@ section.panel{
       <div class="cards" id="advCardsRow"></div>
       <div id="indicFullNote" class="cta-row" style="display:none;">
         <button class="btn primary" id="goToTableauxBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5"/><path d="M21 3 15 21l-4.5-7.5L3 9Z"/></svg> Voir le détail par OF <svg class="icon" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+    </section>
+  </div>
+
+  <div class="page" id="page-plan">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Plan d'action du jour</h2>
+        <span class="count" id="planCount"></span>
+      </div>
+      <div id="planEmpty" class="placeholder">
+        <div class="icon">✓</div>
+        <p>Aucune priorité urgente pour l'instant — tout est sous contrôle.</p>
+      </div>
+      <div id="planContent" style="display:none;">
+        <div class="table-scroll">
+          <table class="data" id="planTable"></table>
+        </div>
       </div>
     </section>
   </div>
@@ -708,6 +734,7 @@ const CLIENT_ERP_NAME = "MK AERO";
 const HISTORY_KEY = "of_historique";
 const LAST_RESULTS_KEY = "of_last_results";
 const DAILY_LOG_KEY = "of_daily_log";
+const TRANSITIONS_KEY = "of_transitions_log";
 const SHEET_CONFIG = {
   "P1 Assemblage": { ofCol: "of", urgenceCol: "arrêt", urgenceMode: "colonne", dateCol: "ar" },
   "P1 client":     { ofCol: "of", urgenceCol: null,    urgenceMode: "tout_urgent", dateCol: "ar" },
@@ -733,6 +760,7 @@ function goToPage(pageKey){
   document.getElementById('page-' + pageKey).classList.add('active');
   if(pageKey === 'graphiques') renderGraphiques();
   if(pageKey === 'aog') renderAOG();
+  if(pageKey === 'plan') renderPlanAction();
 }
 document.querySelectorAll('.nav-item').forEach(el => { el.addEventListener('click', () => goToPage(el.dataset.page)); });
 document.getElementById('goToFichiersBtn').addEventListener('click', () => goToPage('fichiers'));
@@ -807,7 +835,7 @@ function loadLastResults(){
     multiLotsDetail = data.multiLotsDetail || [];
     aogRows = data.aogRows || [];
     lastDateStr = data.dateStr || null;
-    if(resultRows.length){ renderIndicateurs(lastDateStr); renderTables(); renderAOG(); }
+    if(resultRows.length){ renderIndicateurs(lastDateStr); renderTables(); renderAOG(); renderPlanAction(); }
   }catch(e){ /* ignore */ }
 }
 function saveLastResults(dateStr){
@@ -1028,6 +1056,27 @@ function loadDailyLog(){
   try{ const raw = localStorage.getItem(DAILY_LOG_KEY); return raw ? JSON.parse(raw) : {}; }
   catch(e){ return {}; }
 }
+function loadTransitionsLog(){
+  try{ const raw = localStorage.getItem(TRANSITIONS_KEY); return raw ? JSON.parse(raw) : {}; }
+  catch(e){ return {}; }
+}
+function saveTransitionsLog(log){
+  try{ localStorage.setItem(TRANSITIONS_KEY, JSON.stringify(log)); }
+  catch(e){ console.error(e); }
+}
+function logTransitionsForRows(rows, dateStr){
+  const log = loadTransitionsLog();
+  rows.forEach(r => {
+    const arr = log[r.OF] || [];
+    const last = arr[arr.length - 1];
+    if(!last || last.statut !== r.statut){
+      arr.push({ date: dateStr, statut: r.statut });
+      if(arr.length > 15) arr.shift();
+      log[r.OF] = arr;
+    }
+  });
+  saveTransitionsLog(log);
+}
 function getPreviousDayEntry(dateStr){
   const log = loadDailyLog();
   const prevDates = Object.keys(log).filter(d => d < dateStr).sort();
@@ -1113,6 +1162,46 @@ document.getElementById('graphTo').addEventListener('change', renderGraphiques);
 function filterAOG(key){
   aogFilter = key;
   renderAOG();
+}
+
+function renderPlanAction(){
+  const items = [];
+
+  aogRows.filter(r=>r.aogStatus==='depasse').forEach(r=>{
+    items.push({ priorite:1, label:'🔴 AOG dépassé 72h', OF:r.OF, sheet:r.sheet, detail:formatDureeHeures(r.aogHeures), urgent:r.urgent, sev: r.aogHeures||0 });
+  });
+  aogRows.filter(r=>r.alerteBloque).forEach(r=>{
+    items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, detail:`depuis ${r.zeroDepuisJours}j`, urgent:r.urgent, sev: r.zeroDepuisJours||0 });
+  });
+  resultRows.filter(r=>r.isBlocked).forEach(r=>{
+    items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, detail:r.comment, urgent:r.urgent, sev: 0 });
+  });
+  resultRows.filter(r=>r.retardJours!==null).forEach(r=>{
+    items.push({ priorite:4, label:'⏰ En retard', OF:r.OF, sheet:r.sheet, detail:`${r.retardJours} j de retard`, urgent:r.urgent, sev: r.retardJours });
+  });
+
+  items.sort((a,b)=> a.priorite - b.priorite || b.sev - a.sev);
+
+  document.getElementById('planCount').textContent = items.length ? `${items.length} action${items.length>1?'s':''} à traiter` : '';
+
+  if(!items.length){
+    document.getElementById('planEmpty').style.display = '';
+    document.getElementById('planContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('planEmpty').style.display = 'none';
+  document.getElementById('planContent').style.display = '';
+
+  const rowClsByPrio = { 1:'aog-row-depasse', 2:'aog-row-bloque', 3:'aog-row-proche', 4:'' };
+  const body = items.map(it => `<tr class="${rowClsByPrio[it.priorite]}">
+    <td>${it.label}</td>
+    <td>${it.OF}</td>
+    <td>${it.sheet}</td>
+    <td>${it.detail || '—'}</td>
+    <td>${it.urgent ? '<span class="badge urgent">Urgent</span>' : (it.urgent===false ? '<span class="badge normal">Normal</span>' : '<span class="badge normal">?</span>')}</td>
+  </tr>`).join('');
+  document.getElementById('planTable').innerHTML =
+    `<thead><tr><th>Priorité</th><th>OF</th><th>Projet</th><th>Détail</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function renderAOG(){
@@ -1300,6 +1389,7 @@ function traiter(){
   aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase, zeroSince:r.zeroSince }); });
 
   saveHistorique(newHist);
+  logTransitionsForRows(allRows, dateStr);
   saveLastResults(dateStr);
 
   const enRetard = allRows.filter(r=>r.retardJours!==null);
@@ -1332,6 +1422,7 @@ function traiter(){
   renderIndicateurs(dateStr);
   renderTables();
   renderAOG();
+  renderPlanAction();
   setStatus(`Traitement terminé — ${allRows.length} OF analysés.`, false);
   goToPage('indicateurs');
 }
@@ -1549,6 +1640,7 @@ function ofSearch(query){
     box.innerHTML = `<div class="of-search-empty">Aucun OF trouvé pour "${q}".</div>`;
     return;
   }
+  const transitionsLog = loadTransitionsLog();
   box.innerHTML = matches.map(r => {
     const lots = r.isMulti ? multiLotsDetail.filter(l=>l.OF===r.OF) : [];
     const lotsHtml = lots.length ? `<div class="of-comment" style="color:var(--text-dim);">
@@ -1556,6 +1648,14 @@ function ofSearch(query){
     </div>` : '';
     const commentHtml = r.comment ? `<div class="of-comment">⚠ ${r.comment}</div>` : '';
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant', terminé:'Terminé' }[r.evolution] || r.evolution;
+    const historiqueOF = transitionsLog[r.OF] || [];
+    const timelineHtml = historiqueOF.length ? `<div class="of-timeline">
+      <div class="lbl" style="margin-bottom:6px;">📜 Historique des changements</div>
+      ${historiqueOF.map((t,i)=> `<div class="of-timeline-item">
+        <span class="of-timeline-date">${t.date}</span>
+        <span class="of-timeline-statut">${t.statut}</span>
+      </div>`).join('')}
+    </div>` : '';
     return `<div class="of-card">
       <div class="of-head">
         <span class="of-num">OF ${r.OF}</span>
@@ -1570,7 +1670,7 @@ function ofSearch(query){
         <div class="of-field"><div class="lbl">Statut inchangé depuis</div><div class="val">${r.since || '—'}</div></div>
         <div class="of-field"><div class="lbl">Durée à ce poste</div><div class="val">${formatDureeHeures(r.dureeHeures)}</div></div>
       </div>
-      ${commentHtml}${lotsHtml}
+      ${commentHtml}${lotsHtml}${timelineHtml}
     </div>`;
   }).join('');
 }
@@ -1612,7 +1712,7 @@ function checkOpeningAlert(){
 
 loadHistorique();
 loadLastResults();
-if(!resultRows.length){ renderIndicateurs(null); renderTables(); renderAOG(); }
+if(!resultRows.length){ renderIndicateurs(null); renderTables(); renderAOG(); renderPlanAction(); }
 else { checkOpeningAlert(); }
 </script>
 </body>
