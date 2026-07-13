@@ -202,6 +202,7 @@
   .card.c-aog-depasse .card-icon{ background:var(--red-dim); color:var(--red); } .card.c-aog-depasse .num{ color:var(--red); }
   .aog-row-depasse td{ background:rgba(255,69,69,.08) !important; }
   .aog-row-proche td{ background:rgba(255,158,24,.07) !important; }
+  .aog-row-bloque td{ background:rgba(214,72,107,.12) !important; }
 
   .breakdown{ margin-top:20px; }
   .breakdown table{ width:100%; border-collapse:collapse; font-size:12.5px; }
@@ -1112,6 +1113,7 @@ function renderAOG(){
   const proche = aogRows.filter(r=>r.aogStatus==='proche').length;
   const depasse = aogRows.filter(r=>r.aogStatus==='depasse').length;
   const bouges = aogRows.filter(r=>r.evolution==='progressé').length;
+  const bloques = aogRows.filter(r=>r.alerteBloque).length;
   const prev = lastDateStr ? getPreviousDayEntry(lastDateStr) : null;
 
   const cards = [
@@ -1121,15 +1123,18 @@ function renderAOG(){
     ['c-aog-ok','check','Dans les délais (<48h)', ok, 'aogOk', 'neutral'],
     ['c-aog-proche','clock-alert','Approche 72h (48-72h)', proche, 'aogProche', 'down'],
     ['c-aog-depasse','lock','Dépassé 72h', depasse, 'aogDepasse', 'down'],
+    ['c-bloque','pulse-off','🚨 Figé à 0 (+48h)', bloques, 'aogBloques', 'down'],
   ];
   document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir])=>
     `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}</div>`).join('');
 
-  const sorted = aogRows.slice().sort((a,b)=> (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
+  const sorted = aogRows.slice().sort((a,b)=> (b.alerteBloque?1:0)-(a.alerteBloque?1:0) || (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
   const body = sorted.map(r => {
-    const rowCls = r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : '');
+    const rowCls = r.alerteBloque ? 'aog-row-bloque' : (r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : ''));
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant' }[r.evolution] || r.evolution;
-    const statusLabel = { ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h', null:'—' }[r.aogStatus] || '—';
+    const statusLabel = r.alerteBloque
+      ? `🚨 Figé à 0 depuis ${r.zeroDepuisJours}j — à vérifier`
+      : ({ ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h', null:'—' }[r.aogStatus] || '—');
     const urgenceHtml = r.urgent === null ? '<span class="badge normal">?</span>' : (r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>');
     return `<tr class="${rowCls}">
       <td>${r.OF}</td><td>${r.sheet}</td><td>${r.phase}</td>
@@ -1169,17 +1174,27 @@ function buildAOGRows(erpMap, historiqueLocal, dateStr, clientRows){
     else evolution = 'progressé';
 
     const heuresConnues = aogLots.filter(l => l.ageHeures !== null).map(l => l.ageHeures);
-    let aogHeures = null, aogStatus = null;
+    let ageHeuresBrut = null, aogHeures = null, aogStatus = null;
     if(heuresConnues.length){
-      aogHeures = Math.max(...heuresConnues) + BUFFER_RECEPTION_H;
+      ageHeuresBrut = Math.max(...heuresConnues);
+      aogHeures = ageHeuresBrut + BUFFER_RECEPTION_H;
       aogStatus = aogHeures >= 72 ? 'depasse' : (aogHeures >= 48 ? 'proche' : 'ok');
+    }
+
+    // détection "figé à 0" : l'ERP n'affiche aucune progression du tout (coincé en réception)
+    let zeroSince = null, zeroDepuisJours = null, alerteBloque = false;
+    const estZero = ageHeuresBrut !== null && ageHeuresBrut < 0.05;
+    if(estZero){
+      zeroSince = (ancien && ancien.zeroSince) ? ancien.zeroSince : dateStr;
+      zeroDepuisJours = daysBetween(new Date(dateStr+'T00:00:00'), new Date(zeroSince+'T00:00:00'));
+      if(zeroDepuisJours >= 2) alerteBloque = true;
     }
 
     // essaie de retrouver le projet/urgence si cet OF existe aussi dans le fichier client (juste pour affichage)
     const clientRow = clientRows.find(r => r.OF === ofNum);
 
     rows.push({
-      OF: ofNum, phase, evolution, aogHeures, aogStatus,
+      OF: ofNum, phase, evolution, aogHeures, aogStatus, zeroSince, zeroDepuisJours, alerteBloque,
       sheet: clientRow ? clientRow.sheet : '—',
       urgent: clientRow ? clientRow.urgent : null,
     });
@@ -1247,7 +1262,7 @@ function traiter(){
   allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since }); });
 
   aogRows = buildAOGRows(erpMap, historique, dateStr, allRows);
-  aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase }); });
+  aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase, zeroSince:r.zeroSince }); });
 
   saveHistorique(newHist);
   saveLastResults(dateStr);
@@ -1276,6 +1291,7 @@ function traiter(){
     aogOk: aogRows.filter(r=>r.aogStatus==='ok').length,
     aogProche: aogRows.filter(r=>r.aogStatus==='proche').length,
     aogDepasse: aogRows.filter(r=>r.aogStatus==='depasse').length,
+    aogBloques: aogRows.filter(r=>r.alerteBloque).length,
   });
 
   renderIndicateurs(dateStr);
