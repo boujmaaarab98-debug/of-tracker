@@ -865,28 +865,15 @@ document.getElementById('resetHistBtn').addEventListener('click', ()=>{
   setStatus("Historique réinitialisé.", false);
 });
 document.getElementById('fullResetBtn').addEventListener('click', ()=>{
-  const ok1 = confirm("⚠ Ceci va effacer TOUT (historique, graphiques, traçabilité, dernier résultat). Cette action est irréversible. Continuer ?");
-  if(!ok1) return;
-  const ok2 = confirm("Es-tu sûr ? Toutes les données enregistrées dans ce navigateur seront perdues définitivement.");
-  if(!ok2) return;
+  const ok = confirm("⚠ Ceci va effacer TOUT (historique, graphiques, traçabilité, dernier résultat) et recharger la page à zéro. Continuer ?");
+  if(!ok) return;
   try{
     localStorage.removeItem(HISTORY_KEY);
     localStorage.removeItem(DAILY_LOG_KEY);
     localStorage.removeItem(TRANSITIONS_KEY);
     localStorage.removeItem(LAST_RESULTS_KEY);
   }catch(e){ console.error(e); }
-  historique = {};
-  resultRows = [];
-  multiLotsDetail = [];
-  aogRows = [];
-  lastDateStr = null;
-  renderHistoriquePage();
-  renderIndicateurs(null);
-  renderTables();
-  renderAOG();
-  renderPlanAction();
-  setStatus("Réinitialisation complète effectuée — repars avec hier et aujourd'hui.", false);
-  alert("Tout a été effacé. Tu peux maintenant traiter le fichier d'hier, puis celui d'aujourd'hui, pour repartir sur une base propre.");
+  location.reload();
 });
 document.getElementById('exportHistBtn').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(historique, null, 2)], { type:'application/json' });
