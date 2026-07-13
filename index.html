@@ -172,6 +172,8 @@
   .cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; }
   .card{ background:var(--panel-2); border-radius:10px; padding:16px; border:1px solid var(--border-soft); transition:box-shadow .2s, border-color .2s; }
   .card:hover{ border-color:var(--border); }
+  .card.clickable{ cursor:pointer; }
+  .card.clickable:active{ transform:scale(.98); }
   .card.c-total:hover{ box-shadow:0 0 0 1px var(--steel-dim), 0 0 22px -8px var(--steel); }
   .card.c-nouv:hover{ box-shadow:0 0 0 1px var(--violet-dim), 0 0 22px -8px var(--violet); }
   .card.c-prog:hover{ box-shadow:0 0 0 1px var(--teal-dim), 0 0 22px -8px var(--teal); }
@@ -1302,6 +1304,12 @@ function traiter(){
 }
 document.getElementById('processBtn').addEventListener('click', traiter);
 
+function jumpToTab(tabKey){
+  currentTab = tabKey;
+  goToPage('tableaux');
+  renderTables();
+}
+
 function renderIndicateurs(dateStr){
   document.getElementById('indicDate').textContent = dateStr || '';
   const prev = dateStr ? getPreviousDayEntry(dateStr) : null;
@@ -1315,16 +1323,16 @@ function renderIndicateurs(dateStr){
   const multi = resultRows.filter(r=>r.isMulti).length;
 
   const cards = [
-    ['c-total','clipboard-list','Total OF suivis', total, 'total', 'neutral'],
-    ['c-nouv','file-plus','Nouveaux OF', nouveaux, 'nouveaux', 'neutral'],
-    ['c-prog','trending-up','Progressés', progresses, 'progresses', 'up'],
-    ['c-stag','clock-pause','Stagnants', stagnants, 'stagnants', 'down'],
-    ['c-term','check','Terminés', termines, 'termines', 'up'],
-    ['c-urg','alert-triangle','Urgents', urgents, 'urgents', 'down'],
-    ['c-multi','box','Multi-lots', multi, 'multiLots', 'neutral'],
+    ['c-total','clipboard-list','Total OF suivis', total, 'total', 'neutral', 'tous'],
+    ['c-nouv','file-plus','Nouveaux OF', nouveaux, 'nouveaux', 'neutral', 'nouveau'],
+    ['c-prog','trending-up','Progressés', progresses, 'progresses', 'up', 'progressé'],
+    ['c-stag','clock-pause','Stagnants', stagnants, 'stagnants', 'down', 'stagnant'],
+    ['c-term','check','Terminés', termines, 'termines', 'up', 'terminé'],
+    ['c-urg','alert-triangle','Urgents', urgents, 'urgents', 'down', 'urgent'],
+    ['c-multi','box','Multi-lots', multi, 'multiLots', 'neutral', 'multilots'],
   ];
-  document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir])=>
-    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}<div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
+  document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir,tab])=>
+    `<div class="card ${cls} clickable" onclick="jumpToTab('${tab}')"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}<div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
   window.__prevDayEntry = prev;
 
   const sheetIcons = { "P1 Assemblage":"plane", "P1 client":"settings", "Latecoere":"link" };
@@ -1353,14 +1361,14 @@ function renderIndicateurs(dateStr){
   const sansMvt48 = resultRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).length;
 
   const advCards = [
-    ['c-urg','clock-alert','OF en retard', enRetardRows.length, enRetardRows.length, 'enRetard', 'down'],
-    ['c-urg','percentage','Taux de retard', tauxRetard + '%', tauxRetard, 'tauxRetard', 'down'],
-    ['c-stag','calendar-time','Retard moyen', retardMoyen + ' j', parseFloat(retardMoyen), 'retardMoyen', 'down'],
-    ['c-bloque','lock','OF bloqués', bloquesRows.length, bloquesRows.length, 'bloques', 'down'],
-    ['c-sansmvt','pulse-off','Sans mouvement +48h', sansMvt48, sansMvt48, 'sansMvt48', 'down'],
+    ['c-urg','clock-alert','OF en retard', enRetardRows.length, enRetardRows.length, 'enRetard', 'down', 'retard'],
+    ['c-urg','percentage','Taux de retard', tauxRetard + '%', tauxRetard, 'tauxRetard', 'down', 'retard'],
+    ['c-stag','calendar-time','Retard moyen', retardMoyen + ' j', parseFloat(retardMoyen), 'retardMoyen', 'down', 'retard'],
+    ['c-bloque','lock','OF bloqués', bloquesRows.length, bloquesRows.length, 'bloques', 'down', 'bloque'],
+    ['c-sansmvt','pulse-off','Sans mouvement +48h', sansMvt48, sansMvt48, 'sansMvt48', 'down', 'sansmvt'],
   ];
-  document.getElementById('advCardsRow').innerHTML = advCards.map(([cls,ico,lbl,disp,rawVal,key,dir])=>
-    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${disp}</div><div class="lbl">${lbl}</div>${deltaBadge(rawVal, window.__prevDayEntry ? window.__prevDayEntry[key] : null, dir)}</div>`).join('');
+  document.getElementById('advCardsRow').innerHTML = advCards.map(([cls,ico,lbl,disp,rawVal,key,dir,tab])=>
+    `<div class="card ${cls} clickable" onclick="jumpToTab('${tab}')"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${disp}</div><div class="lbl">${lbl}</div>${deltaBadge(rawVal, window.__prevDayEntry ? window.__prevDayEntry[key] : null, dir)}</div>`).join('');
 
   document.getElementById('indicEmptyNote').style.display = total === 0 ? '' : 'none';
   document.getElementById('indicFullNote').style.display = total === 0 ? 'none' : '';
@@ -1371,6 +1379,7 @@ const TABS = [
   { key:'progressé', label:'Progressés' }, { key:'stagnant', label:'Stagnants' },
   { key:'terminé', label:'Terminés' }, { key:'multilots', label:'Multi-lots' },
   { key:'retard', label:'En retard' }, { key:'bloque', label:'Bloqués' },
+  { key:'urgent', label:'Urgents' }, { key:'sansmvt', label:'Sans mouvement' },
 ];
 function renderTables(){
   if(!resultRows.length){
@@ -1389,6 +1398,8 @@ function renderTables(){
     multilots: resultRows.filter(r=>r.isMulti).length,
     retard: resultRows.filter(r=>r.retardJours!==null).length,
     bloque: resultRows.filter(r=>r.isBlocked).length,
+    urgent: resultRows.filter(r=>r.urgent).length,
+    sansmvt: resultRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).length,
   };
   document.getElementById('tabsRow').innerHTML = TABS.map(t =>
     `<div class="tab ${t.key===currentTab?'active':''}" data-tab="${t.key}">${t.label} <span class="n">${counts[t.key]}</span></div>`).join('');
@@ -1446,6 +1457,8 @@ function renderDataTable(){
   else if(currentTab === 'multilots') rows = resultRows.filter(r=>r.isMulti);
   else if(currentTab === 'retard') rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours);
   else if(currentTab === 'bloque') rows = resultRows.filter(r=>r.isBlocked);
+  else if(currentTab === 'urgent') rows = resultRows.filter(r=>r.urgent);
+  else if(currentTab === 'sansmvt') rows = resultRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).sort((a,b)=>(b.sansMouvementJours||0)-(a.sansMouvementJours||0));
   else rows = resultRows.filter(r=>r.evolution===currentTab);
 
   if(!rows.length){
