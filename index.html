@@ -465,6 +465,10 @@ section.panel{
   .page.active{ display:block !important; }
   table.data, .breakdown table{ color:#000 !important; }
   table th, table td{ color:#000 !important; border-color:#ccc !important; }
+  input[type=date]{ display:none !important; }
+  canvas{ filter: contrast(1.3); }
+  #graphContent > div{ border:1px solid #ccc; padding:10px; margin-bottom:16px; }
+  .panel-head h2[style]{ color:#000 !important; }
 }
 </style>
 
@@ -599,6 +603,7 @@ section.panel{
           <input type="date" id="graphFrom">
           <label>au</label>
           <input type="date" id="graphTo">
+          <button class="btn ghost" id="printGraphBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="1"/><path d="M6 17v4h12v-4"/></svg> Imprimer</button>
         </div>
       </div>
       <div id="graphEmpty" class="placeholder">
@@ -1679,6 +1684,11 @@ document.getElementById('ofSearchInput').addEventListener('input', (e) => ofSear
 document.getElementById('printSummaryBtn').addEventListener('click', ()=>{
   goToPage('indicateurs');
   setTimeout(()=> window.print(), 80);
+});
+document.getElementById('printGraphBtn').addEventListener('click', ()=>{
+  goToPage('graphiques');
+  renderGraphiques();
+  setTimeout(()=> window.print(), 150);
 });
 
 function playNotifSound(){
