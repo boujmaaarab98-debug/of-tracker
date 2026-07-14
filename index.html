@@ -919,6 +919,15 @@ function excelDateToJs(value){
   return isNaN(d.getTime()) ? null : d;
 }
 function daysBetween(a, b){ return Math.round((a.getTime() - b.getTime()) / 86400000); }
+function normalizeOF(raw){
+  if(raw === null || raw === undefined) return '';
+  let s = String(raw).trim();
+  // Excel exporte parfois un nombre en "4654686.0" au lieu de "4654686"
+  s = s.replace(/\.0+$/, '');
+  // supprime les zéros de tête superflus (ex: "04654686" -> "4654686"), sans toucher "0" seul
+  s = s.replace(/^0+(?=\d)/, '');
+  return s;
+}
 function ageValueToHours(raw){
   if(raw === null || raw === undefined || raw === '') return null;
   if(typeof raw === 'number' && !isNaN(raw)){
@@ -997,7 +1006,7 @@ function parseERP(wb){
     if(idxClient>=0 && norm(row[idxClient]) !== norm(CLIENT_ERP_NAME)) continue;
     const ofRaw = row[idxCmde];
     if(ofRaw===null || ofRaw===undefined || ofRaw==='') continue;
-    const ofNum = String(ofRaw).trim();
+    const ofNum = normalizeOF(ofRaw);
     const aogVal = idxAOG>=0 ? row[idxAOG] : null;
     const ageHeures = idxAge>=0 ? ageValueToHours(row[idxAge]) : null;
     const lot = {
@@ -1065,7 +1074,7 @@ function parseClientSheet(wb, sheetName, cfg){
     if(!row) continue;
     const ofRaw = row[idxOF];
     if(ofRaw===null || ofRaw===undefined || ofRaw==='') continue;
-    const ofNum = String(ofRaw).trim();
+    const ofNum = normalizeOF(ofRaw);
     let urgent;
     if(cfg.urgenceMode === 'tout_urgent'){ urgent = true; }
     else { const v = idxUrgence>=0 ? row[idxUrgence] : null; urgent = v !== null && v !== undefined && String(v).trim() !== ''; }
