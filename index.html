@@ -1403,9 +1403,11 @@ function traiter(){
         if(hConnues.length) dureeHeures = Math.max(...hConnues) + BUFFER_RECEPTION_H;
       }
 
+      const designationFinale = designationErp || r.designation || (ancien && ancien.designation) || '';
+
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        dureeHeures, designation: designationErp || r.designation });
+        dureeHeures, designation: designationFinale });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1414,7 +1416,7 @@ function traiter(){
   lastDateStr = dateStr;
 
   const newHist = Object.assign({}, historique);
-  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since }); });
+  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since, designation: r.designation || (newHist[r.OF] && newHist[r.OF].designation) }); });
 
   aogRows = buildAOGRows(erpMap, historique, dateStr, allRows);
   aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase, zeroSince:r.zeroSince }); });
