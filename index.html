@@ -1202,7 +1202,7 @@ function renderPlanAction(){
     items.push({ priorite:1, label:'🔴 AOG dépassé 72h', OF:r.OF, sheet:r.sheet, detail:formatDureeHeures(r.aogHeures), urgent:r.urgent, sev: r.aogHeures||0 });
   });
   aogRows.filter(r=>r.alerteBloque).forEach(r=>{
-    items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, detail:`depuis ${r.zeroDepuisJours}j`, urgent:r.urgent, sev: r.zeroDepuisJours||0 });
+    items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, detail:`figé depuis ${formatDureeHeures(r.zeroDureeHeures)}`, urgent:r.urgent, sev: r.zeroDureeHeures||0 });
   });
   resultRows.filter(r=>r.isBlocked).forEach(r=>{
     items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, detail:r.comment, urgent:r.urgent, sev: 0 });
@@ -1288,7 +1288,7 @@ function renderAOG(){
     const rowCls = r.alerteBloque ? 'aog-row-bloque' : (r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : ''));
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant' }[r.evolution] || r.evolution;
     const statusLabel = r.alerteBloque
-      ? `🚨 Figé à 0 depuis ${r.zeroDepuisJours}j — à vérifier`
+      ? `🚨 Figé à 0 depuis ${formatDureeHeures(r.zeroDureeHeures)} — à vérifier`
       : ({ ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h', null:'—' }[r.aogStatus] || '—');
     const urgenceHtml = r.urgent === null ? '<span class="badge normal">?</span>' : (r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>');
     return `<tr class="${rowCls}">
@@ -1337,19 +1337,20 @@ function buildAOGRows(erpMap, historiqueLocal, dateStr, clientRows){
     }
 
     // détection "figé à 0" : l'ERP n'affiche aucune progression du tout (coincé en réception)
-    let zeroSince = null, zeroDepuisJours = null, alerteBloque = false;
+    let zeroSince = null, zeroDepuisJours = null, zeroDureeHeures = null, alerteBloque = false;
     const estZero = ageHeuresBrut !== null && ageHeuresBrut < 0.05;
     if(estZero){
       zeroSince = (ancien && ancien.zeroSince) ? ancien.zeroSince : dateStr;
       zeroDepuisJours = daysBetween(new Date(dateStr+'T00:00:00'), new Date(zeroSince+'T00:00:00'));
-      if(zeroDepuisJours >= 2) alerteBloque = true;
+      zeroDureeHeures = (zeroDepuisJours * 24) + BUFFER_RECEPTION_H;
+      if(zeroDureeHeures >= 48) alerteBloque = true;
     }
 
     // essaie de retrouver le projet/urgence si cet OF existe aussi dans le fichier client (juste pour affichage)
     const clientRow = clientRows.find(r => r.OF === ofNum);
 
     rows.push({
-      OF: ofNum, phase, evolution, aogHeures, aogStatus, zeroSince, zeroDepuisJours, alerteBloque,
+      OF: ofNum, phase, evolution, aogHeures, aogStatus, zeroSince, zeroDepuisJours, zeroDureeHeures, alerteBloque,
       sheet: clientRow ? clientRow.sheet : '—',
       urgent: clientRow ? clientRow.urgent : null,
     });
