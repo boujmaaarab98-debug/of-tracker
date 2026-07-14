@@ -983,6 +983,7 @@ function parseERP(wb){
   let idxNPhase = headers.indexOf('n° phase');
   if(idxNPhase === -1) idxNPhase = headers.findIndex(h => h.includes('phase') && !h.includes('fin'));
   const idxLibelle = idxNPhase >= 0 ? idxNPhase + 1 : headers.findIndex(h=>h.includes('libellé'));
+  const idxDesignationErp = headers.indexOf('libellé');
   const idxCmde = headers.indexOf('cmde client');
   const idxQte = headers.findIndex(h => h.includes('traiter'));
   const idxDateExp = headers.findIndex(h => h.includes('expéd'));
@@ -1002,6 +1003,7 @@ function parseERP(wb){
     const lot = {
       phaseNum: idxNPhase>=0 && row[idxNPhase]!==null ? Number(row[idxNPhase]) : null,
       phaseLibelle: idxLibelle>=0 && row[idxLibelle]!==null ? String(row[idxLibelle]).trim() : '',
+      designationErp: idxDesignationErp>=0 && row[idxDesignationErp]!==null ? String(row[idxDesignationErp]).trim() : '',
       qte: idxQte>=0 ? row[idxQte] : null,
       dateExp: idxDateExp>=0 ? excelDateToJs(row[idxDateExp]) : null,
       aog: aogVal !== null && aogVal !== undefined && String(aogVal).trim() !== '',
@@ -1018,21 +1020,21 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant, knownP
   if(lots && lots.length){
     const remplis = lots.filter(l => qteEstRemplie(l.qte));
     const effectifs = remplis.length > 0 ? remplis : lots;
-    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs, dateExp: effectifs[0].dateExp, comment:null };
+    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs, dateExp: effectifs[0].dateExp, comment:null, designationErp: effectifs[0].designationErp };
     const avecNum = effectifs.filter(l => l.phaseNum !== null && !isNaN(l.phaseNum));
     const bottleneck = avecNum.length ? avecNum.reduce((a,b)=> a.phaseNum <= b.phaseNum ? a : b) : effectifs[0];
-    return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs, dateExp: bottleneck.dateExp, comment:null };
+    return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs, dateExp: bottleneck.dateExp, comment:null, designationErp: bottleneck.designationErp };
   }
   const ancien = historiqueLocal[ofNum];
-  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[], dateExp:null, comment:null };
+  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[], dateExp:null, comment:null, designationErp:null };
   if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))){
     const txt = String(statutExistant).trim();
     const estExactementTermine = norm(txt) === 'terminé';
     const estPhaseConnue = knownPhases && knownPhases.has(norm(txt));
     const estComment = !estExactementTermine && !estPhaseConnue;
-    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estComment ? txt : null };
+    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estComment ? txt : null, designationErp:null };
   }
-  return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null };
+  return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null, designationErp:null };
 }
 
 const JOURS_SEMAINE = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
@@ -1046,6 +1048,7 @@ function parseClientSheet(wb, sheetName, cfg){
   const idxOF = headers.indexOf(cfg.ofCol);
   const idxStatut = headers.indexOf('statut');
   const idxUrgence = cfg.urgenceCol ? headers.indexOf(cfg.urgenceCol) : -1;
+  const idxDesignation = headers.findIndex(h => h.includes('signation'));
 
   let idxDate = -1;
   if(cfg.dateCol === 'ar'){
@@ -1067,6 +1070,7 @@ function parseClientSheet(wb, sheetName, cfg){
     if(cfg.urgenceMode === 'tout_urgent'){ urgent = true; }
     else { const v = idxUrgence>=0 ? row[idxUrgence] : null; urgent = v !== null && v !== undefined && String(v).trim() !== ''; }
     const statutExistant = idxStatut>=0 ? row[idxStatut] : null;
+    const designation = idxDesignation>=0 && row[idxDesignation] ? String(row[idxDesignation]).trim() : '';
     const dateVal = idxDate>=0 ? row[idxDate] : null;
     const dateAssignee = excelDateToJs(dateVal);
     let dateCellComment = '';
@@ -1074,7 +1078,7 @@ function parseClientSheet(wb, sheetName, cfg){
       const txt = String(dateVal).trim();
       if(txt && norm(txt) !== 'non reçu') dateCellComment = txt;
     }
-    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, dateAssignee, dateCellComment });
+    out.push({ OF: ofNum, sheet: sheetName, urgent, statutExistant, dateAssignee, dateCellComment, designation });
   }
   return out;
 }
@@ -1367,7 +1371,7 @@ function traiter(){
   for(const [sheetName, cfg] of Object.entries(SHEET_CONFIG)){
     const rows = parseClientSheet(clientWB, sheetName, cfg);
     for(const r of rows){
-      const { statut, isMulti, lots, dateExp, comment } = determinerStatut(r.OF, erpMap, historique, r.statutExistant, knownPhases);
+      const { statut, isMulti, lots, dateExp, comment, designationErp } = determinerStatut(r.OF, erpMap, historique, r.statutExistant, knownPhases);
       const ancien = historique[r.OF];
       const estTermine = statut === 'terminé';
       let evolution;
@@ -1401,7 +1405,7 @@ function traiter(){
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        dureeHeures });
+        dureeHeures, designation: designationErp || r.designation });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1576,12 +1580,12 @@ function downloadCSV(filename, rows2d){
 function exportCurrentTable(){
   let header, rows;
   if(currentTab === 'retard'){
-    header = ['OF','Projet','Statut','Durée','Date donnée','Retard (j)','Urgence'];
+    header = ['OF','Projet','Désignation','Statut','Durée','Date donnée','Retard (j)','Urgence'];
     rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours)
-      .map(r => [r.OF, r.sheet, r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
+      .map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'bloque'){
-    header = ['OF','Projet','Catégorie','Commentaire','Urgence'];
-    rows = resultRows.filter(r=>r.isBlocked).map(r => [r.OF, r.sheet, r.category, r.comment, r.urgent?'Urgent':'Normal']);
+    header = ['OF','Projet','Désignation','Catégorie','Commentaire','Urgence'];
+    rows = resultRows.filter(r=>r.isBlocked).map(r => [r.OF, r.sheet, r.designation||'', r.category, r.comment, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'multilots'){
     header = ['OF','Projet','Lot','Phase','N° Phase','Qté','Urgence'];
     rows = [];
@@ -1591,9 +1595,9 @@ function exportCurrentTable(){
       });
     });
   } else {
-    header = ['OF','Projet','Statut','Durée','Date donnée','Urgence'];
+    header = ['OF','Projet','Désignation','Statut','Durée','Date donnée','Urgence'];
     const filtered = currentTab === 'tous' ? resultRows : resultRows.filter(r=>r.evolution===currentTab);
-    rows = filtered.map(r => [r.OF, r.sheet, r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.urgent?'Urgent':'Normal']);
+    rows = filtered.map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.urgent?'Urgent':'Normal']);
   }
   if(!rows.length){ alert("Aucune donnée à exporter dans cette catégorie."); return; }
   downloadCSV(`of_tracker_${currentTab}_${lastDateStr||'export'}.csv`, [header, ...rows]);
@@ -1617,11 +1621,11 @@ function renderDataTable(){
     return;
   }
   if(currentTab === 'retard'){
-    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.statut}</td>
+    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td><td>${r.statut}</td>
       <td>${r.dateAssigneeStr || '—'}</td>
       <td style="color:var(--red); font-weight:700;">${r.retardJours} j</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Date donnée</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Date donnée</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     return;
   }
   if(currentTab === 'bloque'){
@@ -1629,11 +1633,11 @@ function renderDataTable(){
     rows.forEach(r => { parCat[r.category] = (parCat[r.category]||0) + 1; });
     const catBadges = Object.entries(parCat).sort((a,b)=>b[1]-a[1])
       .map(([cat,n]) => `<span class="badge multi" style="margin:0 6px 6px 0; font-size:11.5px; padding:4px 10px;">${cat} · ${n}</span>`).join('');
-    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
+    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td>
       <td><span class="badge urgent" style="background:#2a3644; color:#8fb3cc;">${r.category}</span></td>
       <td style="color:var(--red);">${r.comment}</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     document.getElementById('blocageCatBar').innerHTML = catBadges;
     document.getElementById('blocageCatBar').style.display = '';
     return;
@@ -1651,11 +1655,12 @@ function renderDataTable(){
     return;
   }
   const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
+    <td>${r.designation || '—'}</td>
     <td>${r.statut}${r.isMulti ? ' <span class="badge multi">multi-lots</span>' : ''}</td>
     <td>${formatDureeHeures(r.dureeHeures)}</td>
     <td>${r.dateAssigneeStr || '—'}</td>
     <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function ofSearch(query){
@@ -1690,6 +1695,7 @@ function ofSearch(query){
       </div>
       <div class="of-grid">
         <div class="of-field"><div class="lbl">Projet</div><div class="val">${r.sheet}</div></div>
+        <div class="of-field"><div class="lbl">Désignation</div><div class="val">${r.designation || '—'}</div></div>
         <div class="of-field"><div class="lbl">Statut</div><div class="val">${r.statut}</div></div>
         <div class="of-field"><div class="lbl">Évolution</div><div class="val">${evoLabel}</div></div>
         <div class="of-field"><div class="lbl">Date donnée</div><div class="val">${r.dateAssigneeStr || '—'}</div></div>
