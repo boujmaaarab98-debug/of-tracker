@@ -1208,16 +1208,16 @@ function renderPlanAction(){
   const items = [];
 
   aogRows.filter(r=>r.aogStatus==='depasse').forEach(r=>{
-    items.push({ priorite:1, label:'🔴 AOG dépassé 72h', OF:r.OF, sheet:r.sheet, detail:formatDureeHeures(r.aogHeures), urgent:r.urgent, sev: r.aogHeures||0 });
+    items.push({ priorite:1, label:'🔴 AOG dépassé 72h', OF:r.OF, sheet:r.sheet, designation:r.designation, detail:formatDureeHeures(r.aogHeures), urgent:r.urgent, sev: r.aogHeures||0 });
   });
   aogRows.filter(r=>r.alerteBloque).forEach(r=>{
-    items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, detail:`figé depuis ${formatDureeHeures(r.zeroDureeHeures)}`, urgent:r.urgent, sev: r.zeroDureeHeures||0 });
+    items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`figé depuis ${formatDureeHeures(r.zeroDureeHeures)}`, urgent:r.urgent, sev: r.zeroDureeHeures||0 });
   });
   resultRows.filter(r=>r.isBlocked).forEach(r=>{
-    items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, detail:r.comment, urgent:r.urgent, sev: 0 });
+    items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, designation:r.designation, detail:r.comment, urgent:r.urgent, sev: 0 });
   });
   resultRows.filter(r=>r.retardJours!==null).forEach(r=>{
-    items.push({ priorite:4, label:'⏰ En retard', OF:r.OF, sheet:r.sheet, detail:`${r.retardJours} j de retard`, urgent:r.urgent, sev: r.retardJours });
+    items.push({ priorite:4, label:'⏰ En retard', OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`${r.retardJours} j de retard`, urgent:r.urgent, sev: r.retardJours });
   });
 
   items.sort((a,b)=> a.priorite - b.priorite || b.sev - a.sev);
@@ -1237,11 +1237,12 @@ function renderPlanAction(){
     <td>${it.label}</td>
     <td>${it.OF}</td>
     <td>${it.sheet}</td>
+    <td>${it.designation || '—'}</td>
     <td>${it.detail || '—'}</td>
     <td>${it.urgent ? '<span class="badge urgent">Urgent</span>' : (it.urgent===false ? '<span class="badge normal">Normal</span>' : '<span class="badge normal">?</span>')}</td>
   </tr>`).join('');
   document.getElementById('planTable').innerHTML =
-    `<thead><tr><th>Priorité</th><th>OF</th><th>Projet</th><th>Détail</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    `<thead><tr><th>Priorité</th><th>OF</th><th>Projet</th><th>Désignation</th><th>Détail</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function renderAOG(){
@@ -1301,7 +1302,7 @@ function renderAOG(){
       : ({ ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h', null:'—' }[r.aogStatus] || '—');
     const urgenceHtml = r.urgent === null ? '<span class="badge normal">?</span>' : (r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>');
     return `<tr class="${rowCls}">
-      <td>${r.OF}</td><td>${r.sheet}</td><td>${r.phase}</td>
+      <td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td><td>${r.phase}</td>
       <td>${evoLabel}</td>
       <td style="font-weight:700;">${formatDureeHeures(r.aogHeures)}</td>
       <td>${statusLabel}</td>
@@ -1309,7 +1310,7 @@ function renderAOG(){
     </tr>`;
   }).join('');
   document.getElementById('aogTable').innerHTML =
-    `<thead><tr><th>OF</th><th>Projet</th><th>Statut</th><th>Évolution</th><th>Durée AOG</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Évolution</th><th>Durée AOG</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 const BUFFER_RECEPTION_H = 4;
@@ -1358,8 +1359,12 @@ function buildAOGRows(erpMap, historiqueLocal, dateStr, clientRows){
     // essaie de retrouver le projet/urgence si cet OF existe aussi dans le fichier client (juste pour affichage)
     const clientRow = clientRows.find(r => r.OF === ofNum);
 
+    const desigErp = (aogLots.find(l=>l.designationErp) || lots.find(l=>l.designationErp) || {}).designationErp || '';
+    const designation = desigErp || (clientRow && clientRow.designation) || (ancien && ancien.designation) || '';
+
     rows.push({
       OF: ofNum, phase, evolution, aogHeures, aogStatus, zeroSince, zeroDepuisJours, zeroDureeHeures, alerteBloque,
+      designation,
       sheet: clientRow ? clientRow.sheet : '—',
       urgent: clientRow ? clientRow.urgent : null,
     });
