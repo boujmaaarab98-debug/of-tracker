@@ -968,18 +968,27 @@ function formatDureeHeures(heures, joursFallback){
 const CATEGORIES_BLOCAGE = [
   { key:'methode', label:'Méthode', keywords:['méthode','methode','method'] },
   { key:'litige', label:'Litige', keywords:['litige'] },
-  { key:'qualite', label:'Qualité', keywords:['qualité','qualite','défaut','defaut','non conforme',' nc '] },
-  { key:'matiere', label:'Matière / Appro', keywords:['matière','matiere','stock','appro','approvisionnement'] },
+  { key:'qualite', label:'Qualité', keywords:['qualité','qualite','défaut','defaut','non conforme',' nc ','ressuage','retouche'] },
+  { key:'matiere', label:'Matière / Appro', keywords:['matière','matiere','stock','appro','approvisionnement','manque','rupture'] },
   { key:'outillage', label:'Outillage', keywords:['outillage','outil','gabarit'] },
   { key:'machine', label:'Machine', keywords:['machine','panne'] },
-  { key:'document', label:'Document', keywords:['document','plan','dossier','dessin'] },
+  { key:'document', label:'Document', keywords:['document','dossier','dessin','fs','fiche suiveuse'] },
 ];
+const MOTS_BLOCAGE_GENERIQUES = ['bloqu','blocage','attente','arrêt','arret','probl','stand by','standby','stoppé','stoppe','suspend'];
 function classifierCommentaire(text){
   const t = ' ' + norm(text) + ' ';
   for(const cat of CATEGORIES_BLOCAGE){
     if(cat.keywords.some(k => t.includes(k))) return cat.label;
   }
   return 'Autre';
+}
+function estCommentaireBloquant(text){
+  const t = ' ' + norm(text) + ' ';
+  // bloquant si une catégorie connue matche, ou un mot générique de blocage
+  for(const cat of CATEGORIES_BLOCAGE){
+    if(cat.keywords.some(k => t.includes(k))) return true;
+  }
+  return MOTS_BLOCAGE_GENERIQUES.some(k => t.includes(k));
 }
 
 function parseERP(wb){
@@ -1396,7 +1405,7 @@ function traiter(){
       else evolution = 'progressé';
 
       const finalComment = r.dateCellComment || comment || null;
-      const isBlocked = !!finalComment && !estTermine;
+      const isBlocked = !!finalComment && !estTermine && estCommentaireBloquant(finalComment);
       const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
       let retardJours = null;
@@ -1612,9 +1621,9 @@ function exportCurrentTable(){
       });
     });
   } else {
-    header = ['OF','Projet','Désignation','Statut','Durée','Date donnée','Urgence'];
+    header = ['OF','Projet','Désignation','Statut','Durée','Date donnée','Commentaire','Urgence'];
     const filtered = currentTab === 'tous' ? resultRows : resultRows.filter(r=>r.evolution===currentTab);
-    rows = filtered.map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.urgent?'Urgent':'Normal']);
+    rows = filtered.map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.comment||'', r.urgent?'Urgent':'Normal']);
   }
   if(!rows.length){ alert("Aucune donnée à exporter dans cette catégorie."); return; }
   downloadCSV(`of_tracker_${currentTab}_${lastDateStr||'export'}.csv`, [header, ...rows]);
@@ -1676,8 +1685,9 @@ function renderDataTable(){
     <td>${r.statut}${r.isMulti ? ' <span class="badge multi">multi-lots</span>' : ''}</td>
     <td>${formatDureeHeures(r.dureeHeures)}</td>
     <td>${r.dateAssigneeStr || '—'}</td>
+    <td style="${r.isBlocked ? 'color:var(--red);' : 'color:var(--text-dim);'}">${r.comment || '—'}</td>
     <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Commentaire</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function ofSearch(query){
