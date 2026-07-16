@@ -1223,7 +1223,7 @@ function renderPlanAction(){
     items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`figé depuis ${formatDureeHeures(r.zeroDureeHeures)}`, urgent:r.urgent, sev: r.zeroDureeHeures||0 });
   });
   resultRows.filter(r=>r.isBlocked).forEach(r=>{
-    items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, designation:r.designation, detail:r.comment, urgent:r.urgent, sev: 0 });
+    items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`${r.comment} — bloqué depuis ${r.bloqueDepuisJours||0}j`, urgent:r.urgent, sev: r.bloqueDepuisJours||0 });
   });
   resultRows.filter(r=>r.retardJours!==null).forEach(r=>{
     items.push({ priorite:4, label:'⏰ En retard', OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`${r.retardJours} j de retard`, urgent:r.urgent, sev: r.retardJours });
@@ -1408,6 +1408,12 @@ function traiter(){
       const isBlocked = !!finalComment && !estTermine && estCommentaireBloquant(finalComment);
       const category = isBlocked ? classifierCommentaire(finalComment) : null;
 
+      let bloqueSince = null, bloqueDepuisJours = null;
+      if(isBlocked){
+        bloqueSince = (ancien && ancien.bloqueSince) ? ancien.bloqueSince : dateStr;
+        bloqueDepuisJours = daysBetween(today, new Date(bloqueSince + 'T00:00:00'));
+      }
+
       let retardJours = null;
       if(r.dateAssignee && !estTermine && !isBlocked){
         const diff = daysBetween(today, r.dateAssignee);
@@ -1431,7 +1437,7 @@ function traiter(){
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        dureeHeures, designation: designationFinale });
+        dureeHeures, designation: designationFinale, bloqueSince, bloqueDepuisJours });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1440,7 +1446,7 @@ function traiter(){
   lastDateStr = dateStr;
 
   const newHist = Object.assign({}, historique);
-  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since, designation: r.designation || (newHist[r.OF] && newHist[r.OF].designation) }); });
+  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since, designation: r.designation || (newHist[r.OF] && newHist[r.OF].designation), bloqueSince: r.bloqueSince }); });
 
   aogRows = buildAOGRows(erpMap, historique, dateStr, allRows);
   aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase, zeroSince:r.zeroSince }); });
@@ -1610,8 +1616,8 @@ function exportCurrentTable(){
     rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours)
       .map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'bloque'){
-    header = ['OF','Projet','Désignation','Catégorie','Commentaire','Urgence'];
-    rows = resultRows.filter(r=>r.isBlocked).map(r => [r.OF, r.sheet, r.designation||'', r.category, r.comment, r.urgent?'Urgent':'Normal']);
+    header = ['OF','Projet','Désignation','Catégorie','Commentaire','Bloqué depuis (j)','Urgence'];
+    rows = resultRows.filter(r=>r.isBlocked).sort((a,b)=>(b.bloqueDepuisJours||0)-(a.bloqueDepuisJours||0)).map(r => [r.OF, r.sheet, r.designation||'', r.category, r.comment, r.bloqueDepuisJours||0, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'multilots'){
     header = ['OF','Projet','Lot','Phase','N° Phase','Qté','Urgence'];
     rows = [];
@@ -1637,7 +1643,7 @@ function renderDataTable(){
   if(currentTab === 'tous') rows = resultRows;
   else if(currentTab === 'multilots') rows = resultRows.filter(r=>r.isMulti);
   else if(currentTab === 'retard') rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours);
-  else if(currentTab === 'bloque') rows = resultRows.filter(r=>r.isBlocked);
+  else if(currentTab === 'bloque') rows = resultRows.filter(r=>r.isBlocked).sort((a,b)=>(b.bloqueDepuisJours||0)-(a.bloqueDepuisJours||0));
   else if(currentTab === 'urgent') rows = resultRows.filter(r=>r.urgent);
   else if(currentTab === 'sansmvt') rows = resultRows.filter(r=> r.evolution!=='terminé' && (r.sansMouvementJours||0) >= 2).sort((a,b)=>(b.sansMouvementJours||0)-(a.sansMouvementJours||0));
   else rows = resultRows.filter(r=>r.evolution===currentTab);
@@ -1659,11 +1665,16 @@ function renderDataTable(){
     rows.forEach(r => { parCat[r.category] = (parCat[r.category]||0) + 1; });
     const catBadges = Object.entries(parCat).sort((a,b)=>b[1]-a[1])
       .map(([cat,n]) => `<span class="badge multi" style="margin:0 6px 6px 0; font-size:11.5px; padding:4px 10px;">${cat} · ${n}</span>`).join('');
-    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td>
+    const body = rows.map(r => {
+      const dj = r.bloqueDepuisJours || 0;
+      const dureeColor = dj >= 3 ? 'var(--red)' : (dj >= 1 ? 'var(--amber)' : 'var(--text-dim)');
+      return `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td>
       <td><span class="badge urgent" style="background:#2a3644; color:#8fb3cc;">${r.category}</span></td>
       <td style="color:var(--red);">${r.comment}</td>
-      <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+      <td style="color:${dureeColor}; font-weight:700;">${dj} j</td>
+      <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`;
+    }).join('');
+    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Bloqué depuis</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     document.getElementById('blocageCatBar').innerHTML = catBadges;
     document.getElementById('blocageCatBar').style.display = '';
     return;
@@ -1705,7 +1716,7 @@ function ofSearch(query){
     const lotsHtml = lots.length ? `<div class="of-comment" style="color:var(--text-dim);">
       <strong style="color:var(--text);">Multi-lots :</strong> ${lots.map(l=>`Lot ${l.lotNum} — ${l.phase} (qté ${l.qte ?? '?'})`).join(' · ')}
     </div>` : '';
-    const commentHtml = r.comment ? `<div class="of-comment">⚠ ${r.comment}</div>` : '';
+    const commentHtml = r.comment ? `<div class="of-comment">⚠ ${r.comment}${r.isBlocked ? ` — <strong>bloqué depuis ${r.bloqueDepuisJours||0}j</strong>` : ''}</div>` : '';
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant', terminé:'Terminé' }[r.evolution] || r.evolution;
     const historiqueOF = transitionsLog[r.OF] || [];
     const timelineHtml = historiqueOF.length ? `<div class="of-timeline">
