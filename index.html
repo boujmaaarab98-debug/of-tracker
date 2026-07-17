@@ -625,6 +625,25 @@ section.panel{
 
   <div class="page" id="page-aog">
     <section class="panel">
+      <div class="panel-head">
+        <h2>Vérification rapide AOG</h2>
+        <span class="count">Extraction seule — sans fichier client, ne modifie pas l'historique</span>
+      </div>
+      <div class="upload-grid" style="grid-template-columns:1fr;">
+        <div class="dropzone" id="dz-aog">
+          <div class="icon">⬡</div>
+          <div class="label">Export ERP (extraction)</div>
+          <div class="hint">Dépose l'extraction du moment pour voir où en sont les AOG (.xls / .xlsx)</div>
+          <div class="fname" id="fname-aog"></div>
+          <input type="file" id="file-aog" accept=".xlsx,.xls" style="display:none">
+        </div>
+      </div>
+      <div class="upload-actions">
+        <span class="status-msg" id="aogQuickStatus"></span>
+      </div>
+    </section>
+
+    <section class="panel">
       <div class="panel-head"><h2>AOG — Suivi 3 jours</h2></div>
       <div id="aogEmpty" class="placeholder">
         <div class="icon">◇</div>
@@ -817,6 +836,26 @@ function handleFile(file, fnameId, dz, onLoaded){
 }
 setupDropzone('dz-client','file-client','fname-client', wb => { clientWB = wb; });
 setupDropzone('dz-erp','file-erp','fname-erp', wb => { erpWB = wb; });
+setupDropzone('dz-aog','file-aog','fname-aog', wb => { traiterAOGSeul(wb); });
+
+function traiterAOGSeul(wb){
+  const statusEl = document.getElementById('aogQuickStatus');
+  try{
+    const erpMap = parseERP(wb);
+    const dateStr = document.getElementById('heroDateInput').value || new Date().toISOString().slice(0,10);
+    aogRows = buildAOGRows(erpMap, historique, dateStr, resultRows);
+    aogFilter = 'tous';
+    renderAOG();
+    renderPlanAction();
+    saveLastResults(lastDateStr || dateStr);
+    const heure = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+    statusEl.textContent = `✓ AOG mis à jour à ${heure} — ${aogRows.length} OF AOG détectés (historique non modifié).`;
+    statusEl.className = 'status-msg ok';
+  }catch(err){
+    statusEl.textContent = "Erreur : " + err.message;
+    statusEl.className = 'status-msg error';
+  }
+}
 function checkReady(){ document.getElementById('processBtn').disabled = !(clientWB && erpWB); }
 function setStatus(msg, isError){
   const el = document.getElementById('statusMsg');
