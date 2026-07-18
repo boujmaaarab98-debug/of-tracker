@@ -452,7 +452,7 @@ section.panel{
 
 @media print{
   .sidebar, .stepper, #ofSearchPanel, .cta-row, .hist-actions, .alert-toast,
-  .upload-actions, .btn { display:none !important; }
+  .upload-actions, .btn, #aogQuickPanel, .filter-chip { display:none !important; }
   body{ background:#fff !important; color:#000 !important; }
   .main{ padding:0; }
   section.panel{ background:#fff !important; border:1px solid #ccc !important; box-shadow:none !important; color:#000 !important; }
@@ -624,7 +624,7 @@ section.panel{
   </div>
 
   <div class="page" id="page-aog">
-    <section class="panel">
+    <section class="panel" id="aogQuickPanel">
       <div class="panel-head">
         <h2>Vérification rapide AOG</h2>
         <span class="count">Extraction seule — sans fichier client, ne modifie pas l'historique</span>
@@ -643,8 +643,14 @@ section.panel{
       </div>
     </section>
 
-    <section class="panel">
-      <div class="panel-head"><h2>AOG — Suivi 3 jours</h2></div>
+    <section class="panel" id="aogMainPanel">
+      <div class="panel-head">
+        <h2>AOG — Suivi 3 jours</h2>
+        <div style="display:flex; gap:8px;">
+          <button class="btn ghost" id="exportAOGBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> Exporter (CSV)</button>
+          <button class="btn ghost" id="printAOGBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="1"/><path d="M6 17v4h12v-4"/></svg> Imprimer</button>
+        </div>
+      </div>
       <div id="aogEmpty" class="placeholder">
         <div class="icon">◇</div>
         <p>Aucun OF AOG détecté pour l'instant.</p>
@@ -1219,7 +1225,7 @@ function renderGraphiques(){
   document.getElementById('graphContent').style.display = '';
 
   const nouveauxData = dates.map(d => log[d].nouveaux || 0);
-  const terminesData = dates.map(d => log[d].termines || 0);
+  const terminesData = dates.map(d => (log[d].terminesJour !== undefined ? log[d].terminesJour : log[d].termines) || 0);
 
   if(chartNouveauxInstance) chartNouveauxInstance.destroy();
   if(chartTerminesInstance) chartTerminesInstance.destroy();
@@ -1293,6 +1299,35 @@ function renderPlanAction(){
     `<thead><tr><th>Priorité</th><th>OF</th><th>Projet</th><th>Désignation</th><th>Détail</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
+function getFilteredAOGRows(){
+  if(aogFilter === 'nouveau') return aogRows.filter(r=>r.evolution==='nouveau');
+  if(aogFilter === 'bouges') return aogRows.filter(r=>r.evolution==='progressé');
+  if(aogFilter === 'ok') return aogRows.filter(r=>r.aogStatus==='ok');
+  if(aogFilter === 'proche') return aogRows.filter(r=>r.aogStatus==='proche');
+  if(aogFilter === 'depasse') return aogRows.filter(r=>r.aogStatus==='depasse');
+  if(aogFilter === 'bloque') return aogRows.filter(r=>r.alerteBloque);
+  return aogRows;
+}
+
+function exportAOG(){
+  const rows0 = getFilteredAOGRows();
+  if(!rows0.length){ alert("Aucun OF AOG à exporter dans cette catégorie."); return; }
+  const sorted = rows0.slice().sort((a,b)=> (b.alerteBloque?1:0)-(a.alerteBloque?1:0) || (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
+  const header = ['OF','Projet','Désignation','Statut','Évolution','Durée AOG','Délai','Urgence'];
+  const delaiLabel = r => r.alerteBloque ? `Figé à 0 depuis ${formatDureeHeures(r.zeroDureeHeures)}` :
+    ({ ok:'Dans les délais', proche:'Approche 72h', depasse:'Dépassé 72h' }[r.aogStatus] || '—');
+  const rows = sorted.map(r => [r.OF, r.sheet, r.designation||'', r.phase,
+    ({nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant'}[r.evolution]||r.evolution),
+    formatDureeHeures(r.aogHeures), delaiLabel(r),
+    r.urgent===null ? '?' : (r.urgent ? 'Urgent' : 'Normal')]);
+  downloadCSV(`aog_${aogFilter}_${lastDateStr||'export'}.csv`, [header, ...rows]);
+}
+document.getElementById('exportAOGBtn').addEventListener('click', exportAOG);
+document.getElementById('printAOGBtn').addEventListener('click', ()=>{
+  goToPage('aog');
+  setTimeout(()=> window.print(), 80);
+});
+
 function renderAOG(){
   if(!aogRows.length){
     document.getElementById('aogEmpty').style.display = '';
@@ -1323,13 +1358,7 @@ function renderAOG(){
   document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir,filt])=>
     `<div class="card ${cls} clickable ${aogFilter===filt?'card-active':''}" onclick="filterAOG('${filt}')"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}</div>`).join('');
 
-  let filtered = aogRows;
-  if(aogFilter === 'nouveau') filtered = aogRows.filter(r=>r.evolution==='nouveau');
-  else if(aogFilter === 'bouges') filtered = aogRows.filter(r=>r.evolution==='progressé');
-  else if(aogFilter === 'ok') filtered = aogRows.filter(r=>r.aogStatus==='ok');
-  else if(aogFilter === 'proche') filtered = aogRows.filter(r=>r.aogStatus==='proche');
-  else if(aogFilter === 'depasse') filtered = aogRows.filter(r=>r.aogStatus==='depasse');
-  else if(aogFilter === 'bloque') filtered = aogRows.filter(r=>r.alerteBloque);
+  let filtered = getFilteredAOGRows();
 
   const filterLabel = { tous:null, nouveau:'Nouveaux AOG', bouges:'Ont progressé', ok:'Dans les délais',
     proche:'Approche 72h', depasse:'Dépassé 72h', bloque:'Figé à 0 (+48h)' }[aogFilter];
@@ -1437,6 +1466,7 @@ function traiter(){
       const { statut, isMulti, lots, dateExp, comment, designationErp } = determinerStatut(r.OF, erpMap, historique, r.statutExistant, knownPhases);
       const ancien = historique[r.OF];
       const estTermine = statut === 'terminé';
+      const nouveauTermine = estTermine && (!ancien || ancien.statut !== 'terminé');
       let evolution;
       if(estTermine) evolution = 'terminé';
       else if(!ancien) evolution = 'nouveau';
@@ -1476,7 +1506,7 @@ function traiter(){
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        dureeHeures, designation: designationFinale, bloqueSince, bloqueDepuisJours });
+        dureeHeures, designation: designationFinale, bloqueSince, bloqueDepuisJours, nouveauTermine });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1505,6 +1535,7 @@ function traiter(){
     progresses: allRows.filter(r=>r.evolution==='progressé').length,
     stagnants: allRows.filter(r=>r.evolution==='stagnant').length,
     termines: allRows.filter(r=>r.evolution==='terminé').length,
+    terminesJour: allRows.filter(r=>r.nouveauTermine).length,
     urgents: allRows.filter(r=>r.urgent).length,
     enRetard: enRetard.length,
     bloques: bloques.length,
