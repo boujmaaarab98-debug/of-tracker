@@ -1103,8 +1103,11 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant, knownP
 const JOURS_SEMAINE = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
 
 function parseClientSheet(wb, sheetName, cfg){
-  if(!wb.SheetNames.includes(sheetName)) return [];
-  const sheet = wb.Sheets[sheetName];
+  // recherche tolérante du nom de feuille (espaces, majuscules, variantes)
+  let actualName = wb.SheetNames.find(n => norm(n) === norm(sheetName));
+  if(!actualName) actualName = wb.SheetNames.find(n => norm(n).includes(norm(sheetName)) || norm(sheetName).includes(norm(n)));
+  if(!actualName) return [];
+  const sheet = wb.Sheets[actualName];
   const rows = XLSX.utils.sheet_to_json(sheet, { header:1, defval:null });
   if(rows.length < 2) return [];
   const headers = rows[0].map(norm);
@@ -1510,6 +1513,12 @@ function traiter(){
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
+  if(!allRows.length){
+    setStatus("⚠ Aucun OF trouvé ! Vérifie que le fichier CLIENT (feuilles P1 Assemblage / P1 client / Latecoere) est bien dans la 1ère zone et l'export ERP dans la 2ème. Rien n'a été enregistré ni modifié.", true);
+    alert("⚠ Aucun OF trouvé dans le fichier client.\n\nVérifie que tu n'as pas inversé les deux fichiers, ou que les feuilles (P1 Assemblage, P1 client, Latecoere) existent bien.\n\nRien n'a été enregistré — tes données précédentes sont intactes.");
+    return;
+  }
+
   resultRows = allRows;
   multiLotsDetail = multiLots;
   lastDateStr = dateStr;
@@ -1543,6 +1552,15 @@ function traiter(){
     tauxRetard: allRows.length ? Math.round((enRetard.length/allRows.length)*100) : 0,
     retardMoyen: retardMoyenVal,
     sansMvt48: sansMvt48Count,
+    breakdown: Object.keys(SHEET_CONFIG).map(s => {
+      const rs = allRows.filter(r=>r.sheet===s);
+      return { sheet:s, total:rs.length,
+        nouveaux:rs.filter(r=>r.evolution==='nouveau').length,
+        progresses:rs.filter(r=>r.evolution==='progressé').length,
+        stagnants:rs.filter(r=>r.evolution==='stagnant').length,
+        termines:rs.filter(r=>r.evolution==='terminé').length,
+        urgents:rs.filter(r=>r.urgent).length };
+    }),
     aogTotal: aogRows.length,
     aogNouveaux: aogRows.filter(r=>r.evolution==='nouveau').length,
     aogBouges: aogRows.filter(r=>r.evolution==='progressé').length,
@@ -1566,6 +1584,58 @@ function jumpToTab(tabKey){
   goToPage('tableaux');
   renderTables();
 }
+
+function renderIndicateursArchive(dateStr){
+  const log = loadDailyLog();
+  const e = log[dateStr];
+  if(!e) return false;
+  document.getElementById('indicDate').textContent = dateStr + ' — archive';
+  const prev = getPreviousDayEntry(dateStr);
+  const total = e.total || 0;
+
+  const cards = [
+    ['c-total','clipboard-list','Total OF suivis', e.total||0, 'total', 'neutral'],
+    ['c-nouv','file-plus','Nouveaux OF', e.nouveaux||0, 'nouveaux', 'neutral'],
+    ['c-prog','trending-up','Progressés', e.progresses||0, 'progresses', 'up'],
+    ['c-stag','clock-pause','Stagnants', e.stagnants||0, 'stagnants', 'down'],
+    ['c-term','check','Terminés', e.termines||0, 'termines', 'up'],
+    ['c-urg','alert-triangle','Urgents', e.urgents||0, 'urgents', 'down'],
+    ['c-multi','box','Multi-lots', e.multiLots||0, 'multiLots', 'neutral'],
+  ];
+  document.getElementById('cardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir])=>
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}<div class="bar"><span style="width:${total ? Math.round((val/total)*100) : 0}%"></span></div></div>`).join('');
+
+  const advCards = [
+    ['c-urg','clock-alert','OF en retard', e.enRetard||0],
+    ['c-urg','percentage','Taux de retard', (e.tauxRetard||0) + '%'],
+    ['c-stag','calendar-time','Retard moyen', (e.retardMoyen!==undefined ? Number(e.retardMoyen).toFixed(1) : '0') + ' j'],
+    ['c-bloque','lock','OF bloqués', e.bloques||0],
+    ['c-sansmvt','pulse-off','Sans mouvement +48h', e.sansMvt48||0],
+  ];
+  document.getElementById('advCardsRow').innerHTML = advCards.map(([cls,ico,lbl,val])=>
+    `<div class="card ${cls}"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div></div>`).join('');
+
+  if(e.breakdown && e.breakdown.length){
+    const sheetIcons = { "P1 Assemblage":"plane", "P1 client":"settings", "Latecoere":"link" };
+    const rowsHtml = e.breakdown.map(b => `<tr>
+      <td><div class="proj-cell"><span class="proj-icon">${svgIcon(sheetIcons[b.sheet]||'folder')}</span>${b.sheet}</div></td>
+      <td>${b.total}</td><td>${b.nouveaux}</td><td>${b.progresses}</td><td>${b.stagnants}</td><td>${b.termines}</td><td>${b.urgents}</td>
+    </tr>`).join('');
+    document.getElementById('breakdownTable').innerHTML = `
+      <thead><tr><th>Projet / feuille</th><th>Total</th><th>Nouveaux</th><th>Progressés</th><th>Stagnants</th><th>Terminés</th><th>Urgents</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>`;
+  } else {
+    document.getElementById('breakdownTable').innerHTML = `<tbody><tr><td style="color:var(--text-faint); padding:12px;">Détail par projet non disponible pour ce jour archivé.</td></tr></tbody>`;
+  }
+  return true;
+}
+
+document.getElementById('heroDateInput').addEventListener('change', (ev)=>{
+  const d = ev.target.value;
+  if(lastDateStr && d === lastDateStr){ renderIndicateurs(lastDateStr); return; }
+  const ok = renderIndicateursArchive(d);
+  if(!ok && resultRows.length) renderIndicateurs(lastDateStr);
+});
 
 function renderIndicateurs(dateStr){
   document.getElementById('indicDate').textContent = dateStr || '';
