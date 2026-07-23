@@ -657,6 +657,7 @@ section.panel{
       </div>
       <div id="aogContent" style="display:none;">
         <div class="cards" id="aogCardsRow"></div>
+        <div id="aogPosteBar" style="margin-top:16px;"></div>
         <div id="aogFilterChip" class="filter-chip" style="display:none;"></div>
         <div class="table-scroll" style="margin-top:20px;">
           <table class="data" id="aogTable"></table>
@@ -1047,6 +1048,8 @@ function parseERP(wb){
   if(idxNPhase === -1) idxNPhase = headers.findIndex(h => h.includes('phase') && !h.includes('fin'));
   const idxLibelle = idxNPhase >= 0 ? idxNPhase + 1 : headers.findIndex(h=>h.includes('libellé'));
   const idxDesignationErp = headers.indexOf('libellé');
+  const idxOfLelma = headers.indexOf('n° of');
+  const idxLocalisation = headers.indexOf('localisation');
   const idxCmde = headers.indexOf('cmde client');
   const idxQte = headers.findIndex(h => h.includes('traiter'));
   const idxDateExp = headers.findIndex(h => h.includes('expéd'));
@@ -1067,6 +1070,8 @@ function parseERP(wb){
       phaseNum: idxNPhase>=0 && row[idxNPhase]!==null ? Number(row[idxNPhase]) : null,
       phaseLibelle: idxLibelle>=0 && row[idxLibelle]!==null ? String(row[idxLibelle]).trim() : '',
       designationErp: idxDesignationErp>=0 && row[idxDesignationErp]!==null ? String(row[idxDesignationErp]).trim() : '',
+      ofLelma: idxOfLelma>=0 && row[idxOfLelma]!==null ? normalizeOF(row[idxOfLelma]) : '',
+      localisation: idxLocalisation>=0 && row[idxLocalisation]!==null ? String(row[idxLocalisation]).trim() : '',
       qte: idxQte>=0 ? row[idxQte] : null,
       dateExp: idxDateExp>=0 ? excelDateToJs(row[idxDateExp]) : null,
       aog: aogVal !== null && aogVal !== undefined && String(aogVal).trim() !== '',
@@ -1083,21 +1088,21 @@ function determinerStatut(ofNum, erpMap, historiqueLocal, statutExistant, knownP
   if(lots && lots.length){
     const remplis = lots.filter(l => qteEstRemplie(l.qte));
     const effectifs = remplis.length > 0 ? remplis : lots;
-    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs, dateExp: effectifs[0].dateExp, comment:null, designationErp: effectifs[0].designationErp };
+    if(effectifs.length === 1) return { statut: effectifs[0].phaseLibelle, isMulti:false, lots: effectifs, dateExp: effectifs[0].dateExp, comment:null, designationErp: effectifs[0].designationErp, ofLelma: effectifs[0].ofLelma };
     const avecNum = effectifs.filter(l => l.phaseNum !== null && !isNaN(l.phaseNum));
     const bottleneck = avecNum.length ? avecNum.reduce((a,b)=> a.phaseNum <= b.phaseNum ? a : b) : effectifs[0];
-    return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs, dateExp: bottleneck.dateExp, comment:null, designationErp: bottleneck.designationErp };
+    return { statut: bottleneck.phaseLibelle, isMulti:true, lots: effectifs, dateExp: bottleneck.dateExp, comment:null, designationErp: bottleneck.designationErp, ofLelma: bottleneck.ofLelma };
   }
   const ancien = historiqueLocal[ofNum];
-  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[], dateExp:null, comment:null, designationErp:null };
+  if(ancien && ancien.statut && ancien.statut !== 'non reçu') return { statut:'terminé', isMulti:false, lots:[], dateExp:null, comment:null, designationErp:null, ofLelma:null };
   if(statutExistant && !['non reçu','','nan'].includes(norm(statutExistant))){
     const txt = String(statutExistant).trim();
     const estExactementTermine = norm(txt) === 'terminé';
     const estPhaseConnue = knownPhases && knownPhases.has(norm(txt));
     const estComment = !estExactementTermine && !estPhaseConnue;
-    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estComment ? txt : null, designationErp:null };
+    return { statut: txt, isMulti:false, lots:[], dateExp:null, comment: estComment ? txt : null, designationErp:null, ofLelma:null };
   }
-  return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null, designationErp:null };
+  return { statut:'non reçu', isMulti:false, lots:[], dateExp:null, comment:null, designationErp:null, ofLelma:null };
 }
 
 const JOURS_SEMAINE = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
@@ -1270,6 +1275,9 @@ function renderPlanAction(){
   aogRows.filter(r=>r.alerteBloque).forEach(r=>{
     items.push({ priorite:2, label:'🚨 AOG figé à 0', OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`figé depuis ${formatDureeHeures(r.zeroDureeHeures)}`, urgent:r.urgent, sev: r.zeroDureeHeures||0 });
   });
+  aogRows.filter(r=>r.depassePoste && !r.alerteBloque).forEach(r=>{
+    items.push({ priorite:2, label:`⏱ AOG dépassé délai poste (${r.localisation||'?'})`, OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`au poste depuis ${formatDureeHeures(r.dureePosteHeures)}`, urgent:r.urgent, sev: r.dureePosteHeures||0 });
+  });
   resultRows.filter(r=>r.isBlocked).forEach(r=>{
     items.push({ priorite:3, label:`⚠ Bloqué (${r.category})`, OF:r.OF, sheet:r.sheet, designation:r.designation, detail:`${r.comment} — bloqué depuis ${r.bloqueDepuisJours||0}j`, urgent:r.urgent, sev: r.bloqueDepuisJours||0 });
   });
@@ -1309,6 +1317,7 @@ function getFilteredAOGRows(){
   if(aogFilter === 'proche') return aogRows.filter(r=>r.aogStatus==='proche');
   if(aogFilter === 'depasse') return aogRows.filter(r=>r.aogStatus==='depasse');
   if(aogFilter === 'bloque') return aogRows.filter(r=>r.alerteBloque);
+  if(aogFilter === 'depassePoste') return aogRows.filter(r=>r.depassePoste);
   return aogRows;
 }
 
@@ -1316,12 +1325,13 @@ function exportAOG(){
   const rows0 = getFilteredAOGRows();
   if(!rows0.length){ alert("Aucun OF AOG à exporter dans cette catégorie."); return; }
   const sorted = rows0.slice().sort((a,b)=> (b.alerteBloque?1:0)-(a.alerteBloque?1:0) || (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
-  const header = ['OF','Projet','Désignation','Statut','Évolution','Durée AOG','Délai','Urgence'];
+  const header = ['OF','N° OF LELMA','Projet','Désignation','Poste','Statut','Évolution','Durée phase','Durée au poste','Dépassé délai poste','Délai','Urgence'];
   const delaiLabel = r => r.alerteBloque ? `Figé à 0 depuis ${formatDureeHeures(r.zeroDureeHeures)}` :
     ({ ok:'Dans les délais', proche:'Approche 72h', depasse:'Dépassé 72h' }[r.aogStatus] || '—');
-  const rows = sorted.map(r => [r.OF, r.sheet, r.designation||'', r.phase,
+  const rows = sorted.map(r => [r.OF, r.ofLelma||'', r.sheet, r.designation||'', r.localisation||'', r.phase,
     ({nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant'}[r.evolution]||r.evolution),
-    formatDureeHeures(r.aogHeures), delaiLabel(r),
+    formatDureeHeures(r.aogHeures), r.dureePosteHeures !== null ? formatDureeHeures(r.dureePosteHeures) : '',
+    r.depassePoste ? 'OUI' : 'non', delaiLabel(r),
     r.urgent===null ? '?' : (r.urgent ? 'Urgent' : 'Normal')]);
   downloadCSV(`aog_${aogFilter}_${lastDateStr||'export'}.csv`, [header, ...rows]);
 }
@@ -1347,6 +1357,7 @@ function renderAOG(){
   const depasse = aogRows.filter(r=>r.aogStatus==='depasse').length;
   const bouges = aogRows.filter(r=>r.evolution==='progressé').length;
   const bloques = aogRows.filter(r=>r.alerteBloque).length;
+  const depassesPoste = aogRows.filter(r=>r.depassePoste).length;
   const prev = lastDateStr ? getPreviousDayEntry(lastDateStr) : null;
 
   const cards = [
@@ -1357,14 +1368,27 @@ function renderAOG(){
     ['c-aog-proche','clock-alert','Approche 72h (48-72h)', proche, 'aogProche', 'down', 'proche'],
     ['c-aog-depasse','lock','Dépassé 72h', depasse, 'aogDepasse', 'down', 'depasse'],
     ['c-bloque','pulse-off','🚨 Figé à 0 (+48h)', bloques, 'aogBloques', 'down', 'bloque'],
+    ['c-aog-depasse','clock-alert','⏱ Dépassé délai poste (1j)', depassesPoste, 'aogDepassesPoste', 'down', 'depassePoste'],
   ];
   document.getElementById('aogCardsRow').innerHTML = cards.map(([cls,ico,lbl,val,key,dir,filt])=>
     `<div class="card ${cls} clickable ${aogFilter===filt?'card-active':''}" onclick="filterAOG('${filt}')"><div class="card-icon">${svgIcon(ico)}</div><div class="num">${val}</div><div class="lbl">${lbl}</div>${deltaBadge(val, prev ? prev[key] : null, dir)}</div>`).join('');
 
+  // Répartition des AOG par poste (localisation)
+  const parPoste = {};
+  aogRows.forEach(r => {
+    const loc = r.localisation || 'Sans localisation';
+    if(!parPoste[loc]) parPoste[loc] = { total:0, depasses:0 };
+    parPoste[loc].total++;
+    if(r.depassePoste) parPoste[loc].depasses++;
+  });
+  const posteBadges = Object.entries(parPoste).sort((a,b)=>b[1].total-a[1].total)
+    .map(([loc,c]) => `<span class="badge multi" style="margin:0 6px 6px 0; font-size:11.5px; padding:5px 11px; ${c.depasses?'border:1px solid var(--red);':''}">${loc} · ${c.total}${c.depasses ? ` <span style="color:var(--red); font-weight:700;">(${c.depasses} ⏱ dépassé${c.depasses>1?'s':''})</span>` : ''}</span>`).join('');
+  document.getElementById('aogPosteBar').innerHTML = `<div style="font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); margin-bottom:8px;">AOG en cours par poste</div>` + posteBadges;
+
   let filtered = getFilteredAOGRows();
 
   const filterLabel = { tous:null, nouveau:'Nouveaux AOG', bouges:'Ont progressé', ok:'Dans les délais',
-    proche:'Approche 72h', depasse:'Dépassé 72h', bloque:'Figé à 0 (+48h)' }[aogFilter];
+    proche:'Approche 72h', depasse:'Dépassé 72h', bloque:'Figé à 0 (+48h)', depassePoste:'Dépassé délai poste' }[aogFilter];
   document.getElementById('aogFilterChip').style.display = filterLabel ? '' : 'none';
   document.getElementById('aogFilterChip').innerHTML = filterLabel ? `Filtre : <strong>${filterLabel}</strong> <span onclick="filterAOG('tous')">✕</span>` : '';
 
@@ -1375,25 +1399,36 @@ function renderAOG(){
 
   const sorted = filtered.slice().sort((a,b)=> (b.alerteBloque?1:0)-(a.alerteBloque?1:0) || (b.aogHeures ?? -1) - (a.aogHeures ?? -1));
   const body = sorted.map(r => {
-    const rowCls = r.alerteBloque ? 'aog-row-bloque' : (r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : ''));
+    const rowCls = r.alerteBloque ? 'aog-row-bloque' : (r.depassePoste ? 'aog-row-depasse' : (r.aogStatus === 'depasse' ? 'aog-row-depasse' : (r.aogStatus === 'proche' ? 'aog-row-proche' : '')));
     const evoLabel = { nouveau:'Nouveau', progressé:'Progressé', stagnant:'Stagnant' }[r.evolution] || r.evolution;
     const statusLabel = r.alerteBloque
       ? `🚨 Figé à 0 depuis ${formatDureeHeures(r.zeroDureeHeures)} — à vérifier`
       : ({ ok:'Dans les délais', proche:'⚠ Approche 72h', depasse:'🔴 Dépassé 72h', null:'—' }[r.aogStatus] || '—');
     const urgenceHtml = r.urgent === null ? '<span class="badge normal">?</span>' : (r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>');
     return `<tr class="${rowCls}">
-      <td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td><td>${r.phase}</td>
+      <td>${r.OF}</td><td>${r.ofLelma || '—'}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td><td>${r.localisation || '—'}</td><td>${r.phase}</td>
       <td>${evoLabel}</td>
       <td style="font-weight:700;">${formatDureeHeures(r.aogHeures)}</td>
+      <td style="font-weight:700; ${r.depassePoste ? 'color:var(--red);' : ''}">${r.dureePosteHeures !== null ? formatDureeHeures(r.dureePosteHeures) : '—'}${r.depassePoste ? ' ⏱' : ''}</td>
       <td>${statusLabel}</td>
       <td>${urgenceHtml}</td>
     </tr>`;
   }).join('');
   document.getElementById('aogTable').innerHTML =
-    `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Évolution</th><th>Durée AOG</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    `<thead><tr><th>OF</th><th>N° OF LELMA</th><th>Projet</th><th>Désignation</th><th>Poste</th><th>Statut</th><th>Évolution</th><th>Durée phase</th><th>Durée au poste</th><th>Délai</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 const BUFFER_RECEPTION_H = 4;
+// Durée maximale autorisée par poste (en heures). Par défaut 24h (1 jour) pour tous.
+// Pour personnaliser plus tard : ajouter 'nom du poste en minuscules': heures
+const DUREE_MAX_DEFAUT_H = 24;
+const DUREE_MAX_PAR_POSTE_H = {
+  // exemple: 'contrôle final': 48,
+};
+function dureeMaxPoste(localisation){
+  return DUREE_MAX_PAR_POSTE_H[norm(localisation)] || DUREE_MAX_DEFAUT_H;
+}
+
 function buildAOGRows(erpMap, historiqueLocal, dateStr, clientRows){
   const rows = [];
   for(const ofNum in erpMap){
@@ -1440,11 +1475,29 @@ function buildAOGRows(erpMap, historiqueLocal, dateStr, clientRows){
     const clientRow = clientRows.find(r => r.OF === ofNum);
 
     const desigErp = (aogLots.find(l=>l.designationErp) || lots.find(l=>l.designationErp) || {}).designationErp || '';
+    const ofLelmaAog = (aogLots.find(l=>l.ofLelma) || lots.find(l=>l.ofLelma) || {}).ofLelma || (ancien && ancien.ofLelma) || '';
     const designation = desigErp || (clientRow && clientRow.designation) || (ancien && ancien.designation) || '';
+
+    // ---- suivi par POSTE (localisation) : la durée continue même si la phase change dans le même poste ----
+    const localisation = (aogLots.find(l=>l.localisation) || lots.find(l=>l.localisation) || {}).localisation || '';
+    let posteSince = null, dureePosteHeures = null, depassePoste = false;
+    if(localisation){
+      if(ancien && ancien.posteLoc && norm(ancien.posteLoc) === norm(localisation) && ancien.posteSince){
+        posteSince = ancien.posteSince; // même poste qu'avant -> le compteur continue
+      } else {
+        posteSince = dateStr; // nouveau poste -> le compteur repart
+      }
+      const joursPoste = daysBetween(new Date(dateStr+'T00:00:00'), new Date(posteSince+'T00:00:00'));
+      const heuresViaJours = joursPoste * 24 + BUFFER_RECEPTION_H;
+      const heuresViaAge = aogHeures !== null ? aogHeures : 0;
+      dureePosteHeures = Math.max(heuresViaJours, heuresViaAge);
+      depassePoste = dureePosteHeures >= dureeMaxPoste(localisation);
+    }
 
     rows.push({
       OF: ofNum, phase, evolution, aogHeures, aogStatus, zeroSince, zeroDepuisJours, zeroDureeHeures, alerteBloque,
-      designation,
+      designation, ofLelma: ofLelmaAog,
+      localisation, posteSince, dureePosteHeures, depassePoste,
       sheet: clientRow ? clientRow.sheet : '—',
       urgent: clientRow ? clientRow.urgent : null,
     });
@@ -1466,7 +1519,7 @@ function traiter(){
   for(const [sheetName, cfg] of Object.entries(SHEET_CONFIG)){
     const rows = parseClientSheet(clientWB, sheetName, cfg);
     for(const r of rows){
-      const { statut, isMulti, lots, dateExp, comment, designationErp } = determinerStatut(r.OF, erpMap, historique, r.statutExistant, knownPhases);
+      const { statut, isMulti, lots, dateExp, comment, designationErp, ofLelma } = determinerStatut(r.OF, erpMap, historique, r.statutExistant, knownPhases);
       const ancien = historique[r.OF];
       const estTermine = statut === 'terminé';
       const nouveauTermine = estTermine && (!ancien || ancien.statut !== 'terminé');
@@ -1506,10 +1559,11 @@ function traiter(){
       }
 
       const designationFinale = designationErp || r.designation || (ancien && ancien.designation) || '';
+      const ofLelmaFinal = ofLelma || (ancien && ancien.ofLelma) || '';
 
       allRows.push({ OF:r.OF, sheet:sheetName, urgent:r.urgent, statut, isMulti, evolution,
         comment: finalComment, isBlocked, category, retardJours, since: sinceDate, sansMouvementJours, dateAssigneeStr,
-        dureeHeures, designation: designationFinale, bloqueSince, bloqueDepuisJours, nouveauTermine });
+        dureeHeures, designation: designationFinale, bloqueSince, bloqueDepuisJours, nouveauTermine, ofLelma: ofLelmaFinal });
       if(isMulti) lots.forEach((l,idx)=> multiLots.push({ OF:r.OF, sheet:sheetName, lotNum: idx+1, phase:l.phaseLibelle, phaseNum:l.phaseNum, qte:l.qte }));
     }
   }
@@ -1524,10 +1578,10 @@ function traiter(){
   lastDateStr = dateStr;
 
   const newHist = Object.assign({}, historique);
-  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since, designation: r.designation || (newHist[r.OF] && newHist[r.OF].designation), bloqueSince: r.bloqueSince }); });
+  allRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { statut:r.statut, sheet:r.sheet, date:dateStr, since:r.since, designation: r.designation || (newHist[r.OF] && newHist[r.OF].designation), bloqueSince: r.bloqueSince, ofLelma: r.ofLelma || (newHist[r.OF] && newHist[r.OF].ofLelma) }); });
 
   aogRows = buildAOGRows(erpMap, historique, dateStr, allRows);
-  aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase, zeroSince:r.zeroSince }); });
+  aogRows.forEach(r => { newHist[r.OF] = Object.assign({}, newHist[r.OF], { aogPhase:r.phase, zeroSince:r.zeroSince, posteLoc:r.localisation, posteSince:r.posteSince }); });
 
   saveHistorique(newHist);
   logTransitionsForRows(allRows, dateStr);
@@ -1568,6 +1622,7 @@ function traiter(){
     aogProche: aogRows.filter(r=>r.aogStatus==='proche').length,
     aogDepasse: aogRows.filter(r=>r.aogStatus==='depasse').length,
     aogBloques: aogRows.filter(r=>r.alerteBloque).length,
+    aogDepassesPoste: aogRows.filter(r=>r.depassePoste).length,
   });
 
   renderIndicateurs(dateStr);
@@ -1752,12 +1807,12 @@ function downloadCSV(filename, rows2d){
 function exportCurrentTable(){
   let header, rows;
   if(currentTab === 'retard'){
-    header = ['OF','Projet','Désignation','Statut','Durée','Date donnée','Retard (j)','Urgence'];
+    header = ['OF','N° OF LELMA','Projet','Désignation','Statut','Durée','Date donnée','Retard (j)','Urgence'];
     rows = resultRows.filter(r=>r.retardJours!==null).sort((a,b)=>b.retardJours-a.retardJours)
-      .map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
+      .map(r => [r.OF, r.ofLelma||'', r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.retardJours, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'bloque'){
-    header = ['OF','Projet','Désignation','Catégorie','Commentaire','Bloqué depuis (j)','Urgence'];
-    rows = resultRows.filter(r=>r.isBlocked).sort((a,b)=>(b.bloqueDepuisJours||0)-(a.bloqueDepuisJours||0)).map(r => [r.OF, r.sheet, r.designation||'', r.category, r.comment, r.bloqueDepuisJours||0, r.urgent?'Urgent':'Normal']);
+    header = ['OF','N° OF LELMA','Projet','Désignation','Catégorie','Commentaire','Bloqué depuis (j)','Urgence'];
+    rows = resultRows.filter(r=>r.isBlocked).sort((a,b)=>(b.bloqueDepuisJours||0)-(a.bloqueDepuisJours||0)).map(r => [r.OF, r.ofLelma||'', r.sheet, r.designation||'', r.category, r.comment, r.bloqueDepuisJours||0, r.urgent?'Urgent':'Normal']);
   } else if(currentTab === 'multilots'){
     header = ['OF','Projet','Lot','Phase','N° Phase','Qté','Urgence'];
     rows = [];
@@ -1767,9 +1822,9 @@ function exportCurrentTable(){
       });
     });
   } else {
-    header = ['OF','Projet','Désignation','Statut','Durée','Date donnée','Commentaire','Urgence'];
+    header = ['OF','N° OF LELMA','Projet','Désignation','Statut','Durée','Date donnée','Commentaire','Urgence'];
     const filtered = currentTab === 'tous' ? resultRows : resultRows.filter(r=>r.evolution===currentTab);
-    rows = filtered.map(r => [r.OF, r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.comment||'', r.urgent?'Urgent':'Normal']);
+    rows = filtered.map(r => [r.OF, r.ofLelma||'', r.sheet, r.designation||'', r.statut, formatDureeHeures(r.dureeHeures), r.dateAssigneeStr||'', r.comment||'', r.urgent?'Urgent':'Normal']);
   }
   if(!rows.length){ alert("Aucune donnée à exporter dans cette catégorie."); return; }
   downloadCSV(`of_tracker_${currentTab}_${lastDateStr||'export'}.csv`, [header, ...rows]);
@@ -1793,11 +1848,11 @@ function renderDataTable(){
     return;
   }
   if(currentTab === 'retard'){
-    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td><td>${r.statut}</td>
+    const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.ofLelma || '—'}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td><td>${r.statut}</td>
       <td>${r.dateAssigneeStr || '—'}</td>
       <td style="color:var(--red); font-weight:700;">${r.retardJours} j</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Date donnée</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    el.innerHTML = `<thead><tr><th>OF</th><th>N° OF LELMA</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Date donnée</th><th>Retard</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     return;
   }
   if(currentTab === 'bloque'){
@@ -1808,13 +1863,13 @@ function renderDataTable(){
     const body = rows.map(r => {
       const dj = r.bloqueDepuisJours || 0;
       const dureeColor = dj >= 3 ? 'var(--red)' : (dj >= 1 ? 'var(--amber)' : 'var(--text-dim)');
-      return `<tr><td>${r.OF}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td>
+      return `<tr><td>${r.OF}</td><td>${r.ofLelma || '—'}</td><td>${r.sheet}</td><td>${r.designation || '—'}</td>
       <td><span class="badge urgent" style="background:#2a3644; color:#8fb3cc;">${r.category}</span></td>
       <td style="color:var(--red);">${r.comment}</td>
       <td style="color:${dureeColor}; font-weight:700;">${dj} j</td>
       <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`;
     }).join('');
-    el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Bloqué depuis</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+    el.innerHTML = `<thead><tr><th>OF</th><th>N° OF LELMA</th><th>Projet</th><th>Désignation</th><th>Catégorie</th><th>Commentaire / blocage</th><th>Bloqué depuis</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     document.getElementById('blocageCatBar').innerHTML = catBadges;
     document.getElementById('blocageCatBar').style.display = '';
     return;
@@ -1831,14 +1886,14 @@ function renderDataTable(){
     el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Lot</th><th>Phase</th><th>N° Phase</th><th>Qté</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
     return;
   }
-  const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.sheet}</td>
+  const body = rows.map(r => `<tr><td>${r.OF}</td><td>${r.ofLelma || '—'}</td><td>${r.sheet}</td>
     <td>${r.designation || '—'}</td>
     <td>${r.statut}${r.isMulti ? ' <span class="badge multi">multi-lots</span>' : ''}</td>
     <td>${formatDureeHeures(r.dureeHeures)}</td>
     <td>${r.dateAssigneeStr || '—'}</td>
     <td style="${r.isBlocked ? 'color:var(--red);' : 'color:var(--text-dim);'}">${r.comment || '—'}</td>
     <td>${r.urgent ? '<span class="badge urgent">Urgent</span>' : '<span class="badge normal">Normal</span>'}</td></tr>`).join('');
-  el.innerHTML = `<thead><tr><th>OF</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Commentaire</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
+  el.innerHTML = `<thead><tr><th>OF</th><th>N° OF LELMA</th><th>Projet</th><th>Désignation</th><th>Statut</th><th>Durée</th><th>Date donnée</th><th>Commentaire</th><th>Urgence</th></tr></thead><tbody>${body}</tbody>`;
 }
 
 function ofSearch(query){
@@ -1873,6 +1928,7 @@ function ofSearch(query){
       </div>
       <div class="of-grid">
         <div class="of-field"><div class="lbl">Projet</div><div class="val">${r.sheet}</div></div>
+        <div class="of-field"><div class="lbl">N° OF LELMA</div><div class="val">${r.ofLelma || '—'}</div></div>
         <div class="of-field"><div class="lbl">Désignation</div><div class="val">${r.designation || '—'}</div></div>
         <div class="of-field"><div class="lbl">Statut</div><div class="val">${r.statut}</div></div>
         <div class="of-field"><div class="lbl">Évolution</div><div class="val">${evoLabel}</div></div>
